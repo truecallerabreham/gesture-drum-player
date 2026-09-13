@@ -9,14 +9,14 @@ export class DrumTrigger {
     this.onHitCallback = options.onHit || null;
 
     // Responsive thresholds for bare hand movements
-    this.minDownwardVelocity = 0.22; // sensitive downward movement threshold
-    this.minGestureSpeed = 0.35;    // sensitive overall gesture speed
+    this.minDownwardVelocity = 0.18; // sensitive downward movement threshold
+    this.minGestureSpeed = 0.32;    // sensitive overall gesture speed
     this.refractoryPeriod = 42;     // ms cooldown per hand to allow rapid drumming/rolls
 
     // State per hand for independent two-handed playing
     this.handStates = {
-      left: { lastHitTime: -10000, prevVy: 0, wasInside: false },
-      right: { lastHitTime: -10000, prevVy: 0, wasInside: false }
+      left: { lastHitTime: -10000, prevVy: 0, prevY: 0, wasInside: false },
+      right: { lastHitTime: -10000, prevVy: 0, prevY: 0, wasInside: false }
     };
 
     // State per drum pad for test backward compatibility
@@ -73,7 +73,7 @@ export class DrumTrigger {
         : (hand.position || null);
 
       if (!this.handStates[side]) {
-        this.handStates[side] = { lastHitTime: -10000, prevVy: 0, wasInside: false };
+        this.handStates[side] = { lastHitTime: -10000, prevVy: 0, prevY: 0, wasInside: false };
       }
       const handState = this.handStates[side];
 
@@ -85,15 +85,20 @@ export class DrumTrigger {
         ? hand.velocity.speed
         : Math.sqrt(vx * vx + vy * vy + vz * vz);
 
-      // 1. Every-Movement Detection Criteria:
+      // 1. Precision Multi-Factor Strike Detection:
       // a) Direct downward stroke
       const isDownwardStroke = vy > this.minDownwardVelocity;
-      // b) Rebound/deceleration at bottom of stroke (drum hit inflection)
-      const isInflectionRebound = handState.prevVy > 0.20 && vy < (handState.prevVy - 0.12);
+      // b) Rebound / deceleration at bottom of stroke (drum hit inflection)
+      const isInflectionRebound = handState.prevVy > 0.14 && (vy <= 0.05 || vy < (handState.prevVy - 0.12));
       // c) Fast forward plunge or wrist snap
       const isPlungeSnap = vz < -0.25 || speed > this.minGestureSpeed;
+      // d) 3D Virtual drumhead plane crossing
+      const isPlaneCrossing = tipPos && handState.prevY !== undefined && handState.prevY > -0.16 && tipPos.y <= -0.16 && vy > 0.08;
 
-      const isMotionStrike = isDownwardStroke || isInflectionRebound || isPlungeSnap;
+      // Filter out resting hand at bottom of frame (putting hand down to rest)
+      const isRestingAtBottom = hand.position && hand.position.y > 0.88 && vy < 0.28;
+
+      const isMotionStrike = (isDownwardStroke || isInflectionRebound || isPlungeSnap || isPlaneCrossing) && !isRestingAtBottom;
       const cooldownOk = (now - handState.lastHitTime) > this.refractoryPeriod;
 
       // Check targeting or position over the drum
@@ -114,12 +119,14 @@ export class DrumTrigger {
 
         handState.lastHitTime = now;
         handState.prevVy = vy;
+        if (tipPos) handState.prevY = tipPos.y;
 
         this.triggerHit(strikeDrum, hitVelocity, side, tipPos);
         return;
       }
 
       handState.prevVy = vy;
+      if (tipPos) handState.prevY = tipPos.y;
 
       // 2. Proximity cylinder fallback for legacy tests
       for (const [drumName, drum] of Object.entries(this.drums)) {
