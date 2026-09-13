@@ -77,6 +77,19 @@ export class NativeCVTracker {
   }
 
   /**
+   * Anatomical head exclusion classifier:
+   * Rejects blobs located in the upper-central region (head/neck)
+   * regardless of whether the user is moving their head or stationary.
+   */
+  isHeadRegion(meanX, meanY, minY, maxY) {
+    // Upper-central frame zone: y < 40% of height (meanY < 12) and centered horizontally (8 <= meanX <= 31)
+    const isUpperCenter = (meanY < 12) && (meanX >= 8 && meanX <= 31);
+    // Does not extend down into the lower active drumming field (maxY < 17, i.e. no forearm extending down)
+    const isIsolatedUpper = maxY < 17;
+    return isUpperCenter && isIsolatedUpper;
+  }
+
+  /**
    * Connects the on-screen camera preview canvas to render live AR overlays
    */
   setDebugCanvas(canvas) {
@@ -213,8 +226,9 @@ export class NativeCVTracker {
         const skin = this.cellSkin[cIdx];
         const motion = this.cellMotion[cIdx];
         const isFace = this.faceConfidence[cIdx] > 0.40;
+        const isHeadZoneCell = (cy < 12) && (cx >= 8 && cx <= 31);
 
-        if (isFace) continue; // Exclude face/head cells from hand tracking!
+        if (isFace || isHeadZoneCell) continue; // Strictly exclude face/head cells from hand tracking!
 
         const normX = cx / this.cols;
         const normY = cy / this.rows;
@@ -321,9 +335,9 @@ export class NativeCVTracker {
           const meanY = sumY / mass;
           const avgMotion = totalCellMotion / cellCount;
 
-          // Secondary face safeguard: upper-center static blob
-          const isStaticFaceBlob = (meanY < 12 && meanX >= 10 && meanX <= 29 && avgMotion < 15);
-          if (!isStaticFaceBlob) {
+          // Strict anatomical head rejection: moving head is never classified as a hand!
+          const isHead = this.isHeadRegion(meanX, meanY, minY, maxY);
+          if (!isHead) {
             blobs.push({
               cellCount,
               mass,

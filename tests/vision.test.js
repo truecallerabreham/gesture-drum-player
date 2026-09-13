@@ -158,5 +158,21 @@ export function runVisionTests(runner) {
       assert.equal(hand.palmCenter.y, hand.position.y, 'Position matches palm center');
       assert.isTrue(hand.strikeTip.y <= hand.palmCenter.y, 'Strike tip (fingertip) points forward/upward');
     });
+
+    runner.test('NativeCVTracker strictly rejects moving head blobs from hand tracking', (assert) => {
+      const tracker = new NativeCVTracker();
+
+      // Moving head: upper center (meanX = 20, meanY = 8, minY = 3, maxY = 14)
+      const isHead = tracker.isHeadRegion(20, 8, 3, 14);
+      assert.isTrue(isHead, 'Upper-center head blob is strictly identified and rejected');
+
+      // Hand in drumming zone: lower center (meanX = 20, meanY = 18, minY = 14, maxY = 24)
+      const isHand = tracker.isHeadRegion(20, 18, 14, 24);
+      assert.isFalse(isHand, 'Hand in drumming zone is NOT classified as head');
+
+      // Hand on left rim: (meanX = 6, meanY = 16, minY = 12, maxY = 22)
+      const isLeftHand = tracker.isHeadRegion(6, 16, 12, 22);
+      assert.isFalse(isLeftHand, 'Left hand is NOT classified as head');
+    });
   });
 }
