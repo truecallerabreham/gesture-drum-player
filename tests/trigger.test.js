@@ -118,7 +118,7 @@ export function runTriggerTests(runner) {
       assert.equal(hitCount, 0, 'No hit triggered without downward velocity');
     });
 
-    runner.test('Aim-and-strike triggers hit on targeted drum when wrist snaps downward', (assert) => {
+    runner.test('Bare-hand strike triggers hit on targeted drum when hand snaps downward', (assert) => {
       let struck = null;
       const trigger = new DrumTrigger({
         drums: {
@@ -130,19 +130,19 @@ export function runTriggerTests(runner) {
       });
 
       const mockHands = {
-        right: { velocity: { vy: 0.6, vz: 0 } }
+        right: { velocity: { vy: 0.45, vz: 0 } }
       };
 
       const mockAvatarHands = {
-        getTipPosition: () => ({ x: 0, y: 0, z: -1.9 }) // pen held at distance
+        getTipPosition: () => ({ x: 0, y: 0, z: -1.9 })
       };
 
-      const targetedDrums = { right: 'crash' }; // aiming at crash
+      const targetedDrums = { right: 'crash' };
 
       trigger.checkStrikes(mockHands, mockAvatarHands, targetedDrums);
-      assert.isNotNull(struck, 'Aim-and-strike fired');
+      assert.isNotNull(struck, 'Bare-hand strike fired');
       assert.equal(struck.drum, 'crash', 'Struck drum is targeted crash cymbal');
-      assert.equal(struck.source, 'right-pen', 'Source was right pen aim');
+      assert.equal(struck.source, 'right', 'Source was right hand');
     });
 
     runner.test('triggerHit dispatches keyboard strikes for full kit', (assert) => {
@@ -175,9 +175,9 @@ export function runTriggerTests(runner) {
         }
       });
 
-      // 1. Center hit (distance 0.2m from center < 0.58m)
+      // 1. Center hit (distance 0.2m from center < 0.60m)
       const mockCenterTip = {
-        right: { velocity: { vy: 0.6 } }
+        right: { velocity: { vy: 0.4 } }
       };
       const mockCenterAvatar = {
         getTipPosition: () => ({ x: 0.1, y: 0.05, z: -2.0 })
@@ -189,7 +189,7 @@ export function runTriggerTests(runner) {
       // Reset
       struck = null;
 
-      // 2. Rim hit (distance 0.8m from center >= 0.58m)
+      // 2. Rim hit (distance 0.8m from center >= 0.60m)
       const trigger2 = new DrumTrigger({
         drums: {
           snare: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.05, height: 0.8 },
@@ -201,7 +201,7 @@ export function runTriggerTests(runner) {
       });
 
       const mockRimTip = {
-        right: { velocity: { vy: 0.6 } }
+        right: { velocity: { vy: 0.4 } }
       };
       const mockRimAvatar = {
         getTipPosition: () => ({ x: 0.8, y: 0.05, z: -2.0 })
@@ -209,6 +209,34 @@ export function runTriggerTests(runner) {
       trigger2.checkStrikes(mockRimTip, mockRimAvatar);
       assert.isNotNull(struck, 'Rim hit triggered');
       assert.equal(struck.drum, 'rim', 'Hit near perimeter triggers rimshot');
+    });
+
+    runner.test('Rapid alternating two-hand strikes trigger independently without blocking', (assert) => {
+      const hits = [];
+      const trigger = new DrumTrigger({
+        drums: {
+          snare: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.15, height: 0.8 },
+          rim: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.25, height: 0.8 }
+        },
+        onHit: (drum, vel, source) => {
+          hits.push({ drum, vel, source });
+        }
+      });
+
+      // Both hands moving downward simultaneously
+      const mockBothHands = {
+        left: { velocity: { vy: 0.5, speed: 0.5 } },
+        right: { velocity: { vy: 0.6, speed: 0.6 } }
+      };
+
+      const mockAvatar = {
+        getTipPosition: (side) => (side === 'left' ? { x: -0.2, y: 0, z: -2.0 } : { x: 0.2, y: 0, z: -2.0 })
+      };
+
+      trigger.checkStrikes(mockBothHands, mockAvatar);
+      assert.equal(hits.length, 2, 'Both left and right hand strikes fired simultaneously');
+      assert.equal(hits[0].source, 'left', 'Left hand struck');
+      assert.equal(hits[1].source, 'right', 'Right hand struck');
     });
   });
 }
