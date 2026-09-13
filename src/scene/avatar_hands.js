@@ -325,12 +325,12 @@ export class AvatarHands {
         const normY = -(hand.position.y - 0.5) * 2; // 1 to -1
         const depthOffset = (hand.position.z !== undefined) ? hand.position.z : 0;
 
-        const targetX = normX * 2.1;
-        const targetY = normY * 1.1 - 0.15;
+        const targetX = normX * 2.3;
+        const targetY = normY * 1.35 - 0.18;
         const targetZ = -1.65 + depthOffset * 1.2;
 
-        // Smooth position interpolation (lerp)
-        handModel.group.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.55);
+        // Smooth position interpolation (lerp) with high responsiveness
+        handModel.group.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.65);
 
         // 2. 3D Rotation & Wrist Orientation Replication:
         // Extract real-time roll, pitch, and yaw
