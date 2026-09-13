@@ -42,6 +42,14 @@ class AeroDrumApp {
       onStart: () => this.startApp()
     });
 
+    // When background loop triggers a step, also trigger 3D light pulse
+    this.soundEngine.onStep((stepInfo) => {
+      if (this.drumScene && this.soundEngine.isLoopPlaying) {
+        const zone = stepInfo.instrument === 'surdo' || stepInfo.instrument === 'tamborzao' ? 'snare' : 'rim';
+        this.drumScene.onHit(zone, stepInfo.velocity * 0.75, null, 'loop');
+      }
+    });
+
     this.drumTrigger = new DrumTrigger({
       drums: this.drumScene.drumKit.drums,
       onHit: (drumName, velocity, source, position) => {
@@ -89,14 +97,14 @@ class AeroDrumApp {
   }
 
   handleDrumHit(drumName, velocity = 1.0, source = 'gesture', position = null) {
-    // 1. Play low-latency synthesized drum audio
-    this.soundEngine.play(drumName, velocity);
+    // 1. Play low-latency synthesized drum audio (returns stepInfo in Song Beat Mode)
+    const stepInfo = this.soundEngine.play(drumName, velocity);
 
     // 2. Trigger 3D drumhead recoil, shockwave ripple, neon particles & hand pulse
     this.drumScene.onHit(drumName, velocity, position, source);
 
-    // 3. Highlight HUD legend & live strike feedback badge
-    this.hud.flashDrumFeedback(drumName, velocity);
+    // 3. Highlight HUD legend & live strike feedback badge with viral song info
+    this.hud.flashDrumFeedback(drumName, velocity, stepInfo);
   }
 
   animate() {
