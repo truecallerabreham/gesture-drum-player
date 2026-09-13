@@ -96,6 +96,60 @@ export class DrumSynth {
     noise.stop(t + 0.25);
   }
 
+  static playAcousticRimshot(ctx, dest, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+
+    // 1. Sharp high-energy crack (fast pitch envelope from 520Hz down to 220Hz)
+    const crackOsc = ctx.createOscillator();
+    const crackGain = ctx.createGain();
+    crackOsc.type = 'triangle';
+    crackOsc.frequency.setValueAtTime(520, t);
+    crackOsc.frequency.exponentialRampToValueAtTime(220, t + 0.035);
+
+    crackGain.gain.setValueAtTime(1.1 * velocity, t);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+    crackOsc.connect(crackGain);
+    crackGain.connect(dest);
+    crackOsc.start(t);
+    crackOsc.stop(t + 0.1);
+
+    // 2. High metallic rim resonance (dual overtone pings)
+    [1280, 2540].forEach((freq, idx) => {
+      const ping = ctx.createOscillator();
+      const pingGain = ctx.createGain();
+      ping.type = 'sine';
+      ping.frequency.setValueAtTime(freq, t);
+
+      const amp = (idx === 0 ? 0.65 : 0.35) * velocity;
+      pingGain.gain.setValueAtTime(amp, t);
+      pingGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+      ping.connect(pingGain);
+      pingGain.connect(dest);
+      ping.start(t);
+      ping.stop(t + 0.13);
+    });
+
+    // 3. Crisp transient noise burst
+    const noise = ctx.createBufferSource();
+    noise.buffer = DrumSynth.getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(2400, t);
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(1.3 * velocity, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(dest);
+
+    noise.start(t);
+    noise.stop(t + 0.08);
+  }
+
   static playAcousticHiHat(ctx, dest, time = 0, velocity = 1.0, open = false) {
     const t = time || ctx.currentTime;
     const duration = open ? 0.45 : 0.06;
@@ -237,6 +291,40 @@ export class DrumSynth {
 
     noise.start(t);
     noise.stop(t + 0.29);
+  }
+
+  static play808Rimshot(ctx, dest, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+
+    // Classic 808 rimshot: dual tuned oscillators with fast, crisp decay
+    [480, 1680].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+
+      const amp = (idx === 0 ? 1.0 : 0.6) * velocity;
+      gain.gain.setValueAtTime(amp, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.065);
+
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(t);
+      osc.stop(t + 0.07);
+    });
+
+    // 808 snappy click
+    const click = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    click.type = 'triangle';
+    click.frequency.setValueAtTime(950, t);
+    clickGain.gain.setValueAtTime(0.9 * velocity, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
+
+    click.connect(clickGain);
+    clickGain.connect(dest);
+    click.start(t);
+    click.stop(t + 0.03);
   }
 
   static play808HiHat(ctx, dest, time = 0, velocity = 1.0, open = false) {

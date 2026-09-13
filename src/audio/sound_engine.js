@@ -105,6 +105,12 @@ export class SoundEngine {
         else DrumSynth.playAcousticSnare(this.ctx, dest, now, v);
         break;
 
+      case 'rim':
+      case 'rimshot':
+        if (is808) DrumSynth.play808Rimshot(this.ctx, dest, now, v);
+        else DrumSynth.playAcousticRimshot(this.ctx, dest, now, v);
+        break;
+
       case 'hihat':
       case 'hi-hat':
       case 'hat':
