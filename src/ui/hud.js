@@ -83,33 +83,45 @@ export class HUDController {
   updateTargetDisplay(targetDrum) {
     if (!this.aimTargetText) return;
     if (!targetDrum) {
-      this.aimTargetText.textContent = 'Aim: Point at drum';
+      this.aimTargetText.textContent = 'Aim: Point at 3D drum';
       if (this.aimTargetPill) this.aimTargetPill.classList.remove('active-target');
       return;
     }
 
     const labels = {
-      snare: 'Snare',
-      hihat: 'Hi-Hat',
-      tom1: 'High Tom',
-      tom2: 'Floor Tom',
-      crash: 'Crash',
-      kick: 'Kick'
+      snare: '🎯 Center Sweetspot',
+      rim: '⚡ Chrome Rimshot',
+      kick: '🦶 Kick Bass'
     };
 
     const name = labels[targetDrum] || targetDrum.toUpperCase();
-    this.aimTargetText.textContent = `🎯 Aiming: ${name}`;
+    this.aimTargetText.textContent = `${name}`;
     if (this.aimTargetPill) this.aimTargetPill.classList.add('active-target');
   }
 
   /**
-   * Highlights drum legend item upon strike
+   * Highlights drum legend item and live feedback badge upon strike
    */
-  flashDrumFeedback(drumName) {
+  flashDrumFeedback(drumName, velocity = 1.0) {
     const el = document.getElementById(`legend-${drumName}`);
     if (el) {
       el.classList.add('active-hit');
-      setTimeout(() => el.classList.remove('active-hit'), 150);
+      setTimeout(() => el.classList.remove('active-hit'), 180);
+    }
+
+    const strikeBadge = document.getElementById('live-strike-badge');
+    if (strikeBadge) {
+      const isRim = drumName === 'rim';
+      const isKick = drumName === 'kick';
+      const label = isRim ? '⚡ RIMSHOT!' : (isKick ? '🦶 KICK BASS!' : '🎯 SWEETSPOT HIT!');
+      const colorClass = isRim ? 'badge-rim' : (isKick ? 'badge-kick' : 'badge-snare');
+
+      strikeBadge.textContent = label;
+      strikeBadge.className = `live-strike-badge ${colorClass} active`;
+      clearTimeout(this._strikeTimeout);
+      this._strikeTimeout = setTimeout(() => {
+        strikeBadge.classList.remove('active');
+      }, 240);
     }
   }
 }

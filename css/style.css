@@ -232,6 +232,54 @@ header.hud-header {
 }
 
 /* ==========================================================================
+   Live Strike Visual Feedback Meter
+   ========================================================================== */
+
+.live-strike-badge {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.85);
+  opacity: 0;
+  pointer-events: none;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 8px 24px;
+  border-radius: 30px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 100;
+}
+
+.live-strike-badge.active {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.1);
+}
+
+.live-strike-badge.badge-snare {
+  color: #00f0ff;
+  border: 2px solid #00f0ff;
+  background: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.6);
+}
+
+.live-strike-badge.badge-rim {
+  color: #ffaa00;
+  border: 2px solid #ffaa00;
+  background: rgba(255, 170, 0, 0.2);
+  box-shadow: 0 0 30px rgba(255, 170, 0, 0.6);
+}
+
+.live-strike-badge.badge-kick {
+  color: #00ff88;
+  border: 2px solid #00ff88;
+  background: rgba(0, 255, 136, 0.2);
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+}
+
+/* ==========================================================================
    Center Calibration Overlay
    ========================================================================== */
 
