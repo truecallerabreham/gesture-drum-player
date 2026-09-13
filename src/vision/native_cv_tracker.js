@@ -50,9 +50,30 @@ export class NativeCVTracker {
     this.minSkinMass = options.minSkinMass || 12; // Minimum skin pixels to lock hand presence
     this.downwardThreshold = options.downwardThreshold || 0.16; // Sensitive downward velocity
 
+    // 2D Spatial Macrocell Grid (40 columns x 30 rows for 160x120 frame)
+    this.cols = 40;
+    this.rows = 30;
+    this.cellW = this.width / this.cols; // 4 pixels per cell
+    this.cellH = this.height / this.rows; // 4 pixels per cell
+    this.numCells = this.cols * this.rows;
+
+    // Face suppression map (builds confidence for stationary upper skin tone)
+    this.faceConfidence = new Float32Array(this.numCells);
+    this.cellSkin = new Uint8Array(this.numCells);
+    this.cellMotion = new Float32Array(this.numCells);
+    this.cellR = new Float32Array(this.numCells);
+
     // Debug / Live AR canvas
     this.debugCanvas = null;
     this.debugCtx = null;
+  }
+
+  /**
+   * Checks whether a normalized point falls inside a bounding box
+   */
+  isInBBox(x, y, bbox) {
+    if (!bbox || bbox.length < 4) return false;
+    return x >= bbox[0] && x <= bbox[2] && y >= bbox[1] && y <= bbox[3];
   }
 
   /**
@@ -122,17 +143,14 @@ export class NativeCVTracker {
       return { left: null, right: null, count: 0 };
     }
 
-    // 1D column projection accumulators across entire screen width (160 columns)
-    const colMass = new Float32Array(this.width);
-    const colSumY = new Float32Array(this.width);
-    const colSumY2 = new Float32Array(this.width);
-    const colSumXY = new Float32Array(this.width);
-    const colMinY = new Float32Array(this.width).fill(this.height);
-    const colMaxY = new Float32Array(this.width).fill(0);
-    let totalMass = 0;
+    // Reset cell accumulators
+    this.cellSkin.fill(0);
+    this.cellMotion.fill(0);
+    this.cellR.fill(0);
 
     for (let y = 0; y < this.height; y++) {
       const rowOffset = y * this.width;
+      const cy = (y / this.cellH) | 0;
       for (let x = 0; x < this.width; x++) {
         const i = rowOffset + x;
         const idx = i * 4;
@@ -140,28 +158,82 @@ export class NativeCVTracker {
         const g = data[idx + 1];
         const b = data[idx + 2];
 
-        // Luminance
+        // Luminance difference
         const lum = (r * 299 + g * 587 + b * 114) >> 10;
         const diff = Math.abs(lum - this.prevLuminance[i]);
         this.prevLuminance[i] = lum;
 
-        // Check YCbCr skin tone
+        // Chrominance & motion
         const isSkin = NativeCVTracker.isSkinYCbCr(r, g, b);
-        const hasMotion = diff > this.motionThreshold;
 
-        // Pixel contributes if it is skin color OR moving skin
-        if (isSkin || (hasMotion && r > 40)) {
-          const weight = isSkin ? (1.0 + (hasMotion ? diff * 0.08 : 0)) : (diff * 0.05);
-          // Horizontal mirror so camera feed matches player's first-person perspective
-          const mirroredX = this.width - 1 - x;
+        // Horizontal mirror so camera feed matches player's first-person perspective
+        const mx = this.width - 1 - x;
+        const cx = (mx / this.cellW) | 0;
+        const cIdx = cy * this.cols + cx;
 
-          colMass[mirroredX] += weight;
-          colSumY[mirroredX] += y * weight;
-          colSumY2[mirroredX] += y * y * weight;
-          colSumXY[mirroredX] += mirroredX * y * weight;
-          if (y < colMinY[mirroredX]) colMinY[mirroredX] = y;
-          if (y > colMaxY[mirroredX]) colMaxY[mirroredX] = y;
-          totalMass += weight;
+        if (isSkin) {
+          this.cellSkin[cIdx]++;
+        }
+        this.cellMotion[cIdx] += diff;
+        this.cellR[cIdx] += r;
+      }
+    }
+
+    // 1. Stationary Face & Upper Head Region Suppression:
+    // Builds confidence for stationary skin in the upper-central region (face/neck)
+    for (let cy = 0; cy < this.rows; cy++) {
+      for (let cx = 0; cx < this.cols; cx++) {
+        const cIdx = cy * this.cols + cx;
+        const skin = this.cellSkin[cIdx];
+        const motion = this.cellMotion[cIdx];
+
+        // Upper-central face zone: y < 45% of height, x between 25% and 75%
+        const isUpperCenter = (cy < 14) && (cx >= 10 && cx <= 29);
+
+        if (isUpperCenter && skin >= 6 && motion < 22) {
+          // Stationary skin in upper center: build face confidence
+          this.faceConfidence[cIdx] = Math.min(1.0, this.faceConfidence[cIdx] + 0.08);
+        } else if (motion > 45) {
+          // Active dynamic motion (hand waving or striking): decay face confidence
+          this.faceConfidence[cIdx] = Math.max(0, this.faceConfidence[cIdx] - 0.15);
+        } else {
+          // Ambient decay elsewhere
+          this.faceConfidence[cIdx] = Math.max(0, this.faceConfidence[cIdx] - 0.015);
+        }
+      }
+    }
+
+    // 2. Classify Active Hand Candidate Cells:
+    const isCandidate = new Uint8Array(this.numCells);
+    let candidateCount = 0;
+
+    for (let cy = 0; cy < this.rows; cy++) {
+      for (let cx = 0; cx < this.cols; cx++) {
+        const cIdx = cy * this.cols + cx;
+        const skin = this.cellSkin[cIdx];
+        const motion = this.cellMotion[cIdx];
+        const isFace = this.faceConfidence[cIdx] > 0.40;
+
+        if (isFace) continue; // Exclude face/head cells from hand tracking!
+
+        const normX = cx / this.cols;
+        const normY = cy / this.rows;
+        const inRecentLeft = this.history.left.active && this.isInBBox(normX, normY, this.history.left.bbox);
+        const inRecentRight = this.history.right.active && this.isInBBox(normX, normY, this.history.right.bbox);
+
+        // Hand candidate criteria:
+        // a) Moving skin pixels
+        // b) Skin in the lower playing field (cy >= 8)
+        // c) Dynamic optical flow with hand luminance
+        // d) Persistent hand tracking within recent bounding box
+        const isMovingSkin = (skin >= 3 && motion > 6);
+        const isHandZoneSkin = (cy >= 8 && skin >= 6);
+        const isFastMotion = (motion > 30 && (this.cellR[cIdx] / 16) > 35);
+        const isPersistentHand = ((inRecentLeft || inRecentRight) && skin >= 4);
+
+        if (isMovingSkin || isHandZoneSkin || isFastMotion || isPersistentHand) {
+          isCandidate[cIdx] = 1;
+          candidateCount++;
         }
       }
     }
@@ -172,7 +244,7 @@ export class NativeCVTracker {
       count: 0
     };
 
-    if (totalMass < this.minSkinMass) {
+    if (candidateCount < 3) {
       detected.left = this.decayHandState('left', dt, timestamp);
       detected.right = this.decayHandState('right', dt, timestamp);
       if (detected.left) detected.count++;
@@ -181,149 +253,186 @@ export class NativeCVTracker {
       return detected;
     }
 
-    // Smooth column profile with 3-tap filter
-    const smoothMass = new Float32Array(this.width);
-    for (let x = 1; x < this.width - 1; x++) {
-      smoothMass[x] = 0.25 * colMass[x - 1] + 0.5 * colMass[x] + 0.25 * colMass[x + 1];
-    }
+    // 3. 2D Connected-Component Clustering (BFS on 40x30 grid):
+    const visited = new Uint8Array(this.numCells);
+    const blobs = [];
+    const queue = new Int32Array(this.numCells);
 
-    // Find peaks (local maxima) with significant mass
-    const peaks = [];
-    for (let x = 3; x < this.width - 3; x++) {
-      if (smoothMass[x] > smoothMass[x - 1] &&
-          smoothMass[x] > smoothMass[x + 1] &&
-          smoothMass[x] > smoothMass[x - 2] &&
-          smoothMass[x] > smoothMass[x + 2] &&
-          smoothMass[x] > 4.0) {
-        peaks.push({ x, mass: smoothMass[x] });
-      }
-    }
+    for (let cy = 0; cy < this.rows; cy++) {
+      for (let cx = 0; cx < this.cols; cx++) {
+        const startIdx = cy * this.cols + cx;
+        if (!isCandidate[startIdx] || visited[startIdx]) continue;
 
-    peaks.sort((a, b) => b.mass - a.mass);
+        // BFS traversal
+        let qHead = 0, qTail = 0;
+        queue[qTail++] = startIdx;
+        visited[startIdx] = 1;
 
-    // Determine if we have 2 distinct hands or 1 hand moving anywhere on screen
-    let isDualHands = false;
-    let splitX = Math.floor(this.width / 2);
+        let cellCount = 0;
+        let mass = 0;
+        let sumX = 0, sumY = 0;
+        let sumX2 = 0, sumY2 = 0, sumXY = 0;
+        let minX = cx, maxX = cx, minY = cy, maxY = cy;
+        let totalCellMotion = 0;
 
-    if (peaks.length >= 2) {
-      const p1 = peaks[0].x;
-      const p2 = peaks[1].x;
-      const dist = Math.abs(p1 - p2);
+        while (qHead < qTail) {
+          const curr = queue[qHead++];
+          const curY = (curr / this.cols) | 0;
+          const curX = curr % this.cols;
 
-      // If the two peaks are separated by at least 22 pixels (~14% screen width)
-      if (dist >= 22) {
-        isDualHands = true;
-        const leftP = Math.min(p1, p2);
-        const rightP = Math.max(p1, p2);
+          const skin = this.cellSkin[curr];
+          const motion = this.cellMotion[curr];
+          const weight = (skin * 0.12) + (motion * 0.02) + 0.4;
 
-        // Find the valley (lowest mass column) between the two peaks
-        let minV = Infinity;
-        for (let x = leftP; x <= rightP; x++) {
-          if (smoothMass[x] < minV) {
-            minV = smoothMass[x];
-            splitX = x;
+          mass += weight;
+          sumX += curX * weight;
+          sumY += curY * weight;
+          sumX2 += curX * curX * weight;
+          sumY2 += curY * curY * weight;
+          sumXY += curX * curY * weight;
+          totalCellMotion += motion;
+
+          if (curX < minX) minX = curX;
+          if (curX > maxX) maxX = curX;
+          if (curY < minY) minY = curY;
+          if (curY > maxY) maxY = curY;
+          cellCount++;
+
+          // 4-connected neighbors
+          const neighbors = [
+            curX > 0 ? curr - 1 : -1,
+            curX < this.cols - 1 ? curr + 1 : -1,
+            curY > 0 ? curr - this.cols : -1,
+            curY < this.rows - 1 ? curr + this.cols : -1
+          ];
+
+          for (let n = 0; n < 4; n++) {
+            const nb = neighbors[n];
+            if (nb >= 0 && isCandidate[nb] && !visited[nb]) {
+              visited[nb] = 1;
+              queue[qTail++] = nb;
+            }
+          }
+        }
+
+        // Keep significant hand clusters
+        if (cellCount >= 3 && mass >= 3.0) {
+          const meanX = sumX / mass;
+          const meanY = sumY / mass;
+          const avgMotion = totalCellMotion / cellCount;
+
+          // Secondary face safeguard: upper-center static blob
+          const isStaticFaceBlob = (meanY < 12 && meanX >= 10 && meanX <= 29 && avgMotion < 15);
+          if (!isStaticFaceBlob) {
+            blobs.push({
+              cellCount,
+              mass,
+              meanX,
+              meanY,
+              sumX,
+              sumY,
+              sumX2,
+              sumY2,
+              sumXY,
+              minX,
+              maxX,
+              minY,
+              maxY,
+              avgMotion,
+              score: mass * (1.0 + Math.min(2.0, avgMotion * 0.05))
+            });
           }
         }
       }
     }
 
-    // Helper to compute hand centroid, orientation, openness, and scale from a column range
-    const extractHandFromRange = (startCol, endCol) => {
-      let sumM = 0, sumX = 0, sumY = 0;
-      let sumX2 = 0, sumY2 = 0, sumXY = 0;
-      let minX = this.width, maxX = 0, minY = this.height, maxY = 0;
+    // Sort blobs by significance score
+    blobs.sort((a, b) => b.score - a.score);
 
-      for (let x = startCol; x <= endCol; x++) {
-        const m = colMass[x];
-        if (m <= 0.001) continue;
-        sumM += m;
-        sumX += x * m;
-        sumY += colSumY[x];
-        sumX2 += x * x * m;
-        sumY2 += colSumY2[x];
-        sumXY += colSumXY[x];
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (colMinY[x] < minY) minY = colMinY[x];
-        if (colMaxY[x] > maxY) maxY = colMaxY[x];
-      }
+    // 4. Extract hand metrics from a blob
+    const extractHandDataFromBlob = (b) => {
+      const rawX = b.meanX / this.cols;
+      const rawY = b.meanY / this.rows;
+      // Leading fingertip: uppermost cell of blob (minY in screen space)
+      const strikeY = b.minY / this.rows;
+      const bbox = [
+        Math.max(0, (b.minX - 0.5) / this.cols),
+        Math.max(0, (b.minY - 0.5) / this.rows),
+        Math.min(1, (b.maxX + 1.5) / this.cols),
+        Math.min(1, (b.maxY + 1.5) / this.rows)
+      ];
 
-      if (sumM < this.minSkinMass) return null;
-
-      const meanX = sumX / sumM;
-      const meanY = sumY / sumM;
-      const rawX = meanX / this.width;
-      const rawY = meanY / this.height;
-      const strikeY = maxY / this.height;
-      const bbox = [minX / this.width, minY / this.height, maxX / this.width, maxY / this.height];
-
-      const mu20 = (sumX2 / sumM) - (meanX * meanX);
-      const mu02 = (sumY2 / sumM) - (meanY * meanY);
-      const mu11 = (sumXY / sumM) - (meanX * meanY);
+      const mu20 = (b.sumX2 / b.mass) - (b.meanX * b.meanX);
+      const mu02 = (b.sumY2 / b.mass) - (b.meanY * b.meanY);
+      const mu11 = (b.sumXY / b.mass) - (b.meanX * b.meanY);
 
       const roll = 0.5 * Math.atan2(2 * mu11, mu20 - mu02);
       const dispersion = Math.sqrt(Math.max(0, mu20 + mu02));
-      const openness = Math.max(0.3, Math.min(1.8, dispersion / 14.0));
-      const handScale = Math.max(0.6, Math.min(2.2, Math.sqrt(sumM) / 12.0));
+      const openness = Math.max(0.4, Math.min(1.8, dispersion / 2.8));
+      const handScale = Math.max(0.6, Math.min(2.2, Math.sqrt(b.mass) / 3.4));
 
       return { rawX, rawY, strikeY, bbox, roll, openness, handScale };
     };
 
-    if (isDualHands) {
-      // DUAL HAND MODE: Two separate hands present simultaneously
-      const leftData = extractHandFromRange(0, splitX - 1);
-      const rightData = extractHandFromRange(splitX, this.width - 1);
+    let isDualHands = false;
+    let splitX = (this.width / 2) | 0;
 
-      if (leftData) {
+    if (blobs.length >= 2) {
+      const b1 = blobs[0];
+      const b2 = blobs[1];
+      const xDist = Math.abs(b1.meanX - b2.meanX);
+
+      // If two blobs are separated horizontally by at least 5 cells (~12.5% screen width)
+      if (xDist >= 5) {
+        isDualHands = true;
+        const leftBlob = b1.meanX < b2.meanX ? b1 : b2;
+        const rightBlob = b1.meanX < b2.meanX ? b2 : b1;
+        splitX = (((leftBlob.meanX + rightBlob.meanX) * 0.5) / this.cols * this.width) | 0;
+
+        const leftData = extractHandDataFromBlob(leftBlob);
+        const rightData = extractHandDataFromBlob(rightBlob);
+
         detected.left = this.updateHandState('left', leftData.rawX, leftData.rawY, leftData.strikeY, leftData.bbox, dt, timestamp, leftData);
         detected.count++;
-      } else {
-        detected.left = this.decayHandState('left', dt, timestamp);
-        if (detected.left) detected.count++;
-      }
 
-      if (rightData) {
         detected.right = this.updateHandState('right', rightData.rawX, rightData.rawY, rightData.strikeY, rightData.bbox, dt, timestamp, rightData);
         detected.count++;
-      } else {
-        detected.right = this.decayHandState('right', dt, timestamp);
-        if (detected.right) detected.count++;
-      }
-    } else {
-      // SINGLE HAND MODE: Play anywhere across the FULL SCREEN and entire drumhead!
-      const singleData = extractHandFromRange(0, this.width - 1);
-
-      if (singleData) {
-        // Choose which hand slot to update based on previous active state or horizontal position
-        let targetSide = 'right';
-        let otherSide = 'left';
-
-        if (this.history.left.active && !this.history.right.active) {
-          targetSide = 'left';
-          otherSide = 'right';
-        } else if (this.history.right.active && !this.history.left.active) {
-          targetSide = 'right';
-          otherSide = 'left';
-        } else {
-          // If neither or both was active, assign based on centroid
-          targetSide = singleData.rawX < 0.5 ? 'left' : 'right';
-          otherSide = targetSide === 'left' ? 'right' : 'left';
-        }
-
-        detected[targetSide] = this.updateHandState(targetSide, singleData.rawX, singleData.rawY, singleData.strikeY, singleData.bbox, dt, timestamp, singleData);
-        detected.count++;
-
-        detected[otherSide] = this.decayHandState(otherSide, dt, timestamp);
-        if (detected[otherSide]) detected.count++;
-      } else {
-        detected.left = this.decayHandState('left', dt, timestamp);
-        detected.right = this.decayHandState('right', dt, timestamp);
-        if (detected.left) detected.count++;
-        if (detected.right) detected.count++;
       }
     }
 
-    // Render live AR debug camera view
+    if (!isDualHands && blobs.length >= 1) {
+      // Single hand mode: play ANYWHERE on the screen (left, center sweetspot, right)
+      const singleBlob = blobs[0];
+      const singleData = extractHandDataFromBlob(singleBlob);
+
+      // Determine which hand slot to update based on previous active state or position
+      let targetSide = 'right';
+      let otherSide = 'left';
+
+      if (this.history.left.active && !this.history.right.active) {
+        targetSide = 'left';
+        otherSide = 'right';
+      } else if (this.history.right.active && !this.history.left.active) {
+        targetSide = 'right';
+        otherSide = 'left';
+      } else {
+        targetSide = singleData.rawX < 0.5 ? 'left' : 'right';
+        otherSide = targetSide === 'left' ? 'right' : 'left';
+      }
+
+      detected[targetSide] = this.updateHandState(targetSide, singleData.rawX, singleData.rawY, singleData.strikeY, singleData.bbox, dt, timestamp, singleData);
+      detected.count++;
+
+      detected[otherSide] = this.decayHandState(otherSide, dt, timestamp);
+      if (detected[otherSide]) detected.count++;
+    } else if (blobs.length === 0) {
+      detected.left = this.decayHandState('left', dt, timestamp);
+      detected.right = this.decayHandState('right', dt, timestamp);
+      if (detected.left) detected.count++;
+      if (detected.right) detected.count++;
+    }
+
+    // Render AR overlay on camera preview
     this.renderAROverlay(video, detected, splitX, isDualHands);
 
     return detected;
@@ -370,9 +479,11 @@ export class NativeCVTracker {
 
     // Instantaneous velocities (positive vy = downward strike motion)
     const rawVx = (smoothedX - h.x) / dt;
-    const rawVy = (smoothedStrikeY - h.strikeY) / dt;
+    const rawVy = (smoothedY - h.y) / dt;
+    const strikeRawVy = (smoothedStrikeY - h.strikeY) / dt;
+    const effectiveRawVy = Math.max(rawVy, strikeRawVy);
     const vx = 0.6 * rawVx + 0.4 * h.vx;
-    const vy = 0.65 * rawVy + 0.35 * h.vy;
+    const vy = 0.65 * effectiveRawVy + 0.35 * h.vy;
     const speed = Math.sqrt(vx * vx + vy * vy);
 
     // Depth Z: hand scale maps to depth relative to camera & drum
@@ -394,7 +505,8 @@ export class NativeCVTracker {
 
     return {
       side,
-      position: { x: smoothedX, y: smoothedStrikeY, z: depthZ },
+      position: { x: smoothedX, y: smoothedY, z: depthZ },
+      strikeTip: { x: smoothedX, y: smoothedStrikeY, z: depthZ },
       palmCenter: { x: smoothedX, y: smoothedY, z: depthZ },
       wrist: landmarks[0],
       velocity: { vx, vy, vz: -speed * 0.4, speed },
@@ -432,7 +544,8 @@ export class NativeCVTracker {
     const landmarks = this.generateSyntheticLandmarks(h.x, h.y, h.strikeY, side, h.roll || 0, h.openness || 1.0);
     return {
       side,
-      position: { x: h.x, y: h.strikeY, z: depthZ },
+      position: { x: h.x, y: h.y, z: depthZ },
+      strikeTip: { x: h.x, y: h.strikeY, z: depthZ },
       palmCenter: { x: h.x, y: h.y, z: depthZ },
       wrist: landmarks[0],
       velocity: { vx: h.vx, vy: h.vy, vz: 0, speed: Math.abs(h.vy) },
@@ -470,7 +583,12 @@ export class NativeCVTracker {
     this.debugCtx.fillStyle = 'rgba(10, 15, 25, 0.35)';
     this.debugCtx.fillRect(0, 0, dw, dh);
 
-    // 3. Dynamic separation line only when 2 hands are active simultaneously
+    // 3. Face filter status badge
+    this.debugCtx.fillStyle = 'rgba(0, 240, 255, 0.85)';
+    this.debugCtx.font = 'bold 8px monospace';
+    this.debugCtx.fillText('2D SPATIAL CV • FACE FILTER ON', 6, 11);
+
+    // 4. Dynamic separation line only when 2 hands are active simultaneously
     if (isDualHands && splitX !== null) {
       const divX = (splitX / this.width) * dw;
       this.debugCtx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
@@ -482,7 +600,7 @@ export class NativeCVTracker {
       this.debugCtx.setLineDash([]);
     }
 
-    // 4. Render Left Hand AR Overlay (Neon Cyan)
+    // 5. Render Left Hand AR Overlay (Neon Cyan)
     if (detected.left) {
       const p = detected.left.position;
       const px = p.x * dw;
@@ -491,7 +609,15 @@ export class NativeCVTracker {
       const roll = detected.left.rotation ? detected.left.rotation.roll : 0;
       const radius = Math.max(8, Math.min(20, 11 * openness));
 
-      // Glow circle around hand strike point (scales with hand openness)
+      // Hand Bounding Box
+      if (detected.left.bbox) {
+        const b = detected.left.bbox;
+        this.debugCtx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+        this.debugCtx.lineWidth = 1;
+        this.debugCtx.strokeRect(b[0] * dw, b[1] * dh, (b[2] - b[0]) * dw, (b[3] - b[1]) * dh);
+      }
+
+      // Glow circle around hand palm point
       this.debugCtx.strokeStyle = '#00f0ff';
       this.debugCtx.lineWidth = 2;
       this.debugCtx.shadowColor = '#00f0ff';
@@ -527,7 +653,7 @@ export class NativeCVTracker {
       this.debugCtx.fillText(`LEFT (${stateLabel})`, px - 18, py - (radius + 4));
     }
 
-    // 5. Render Right Hand AR Overlay (Neon Gold)
+    // 6. Render Right Hand AR Overlay (Neon Gold)
     if (detected.right) {
       const p = detected.right.position;
       const px = p.x * dw;
@@ -536,7 +662,15 @@ export class NativeCVTracker {
       const roll = detected.right.rotation ? detected.right.rotation.roll : 0;
       const radius = Math.max(8, Math.min(20, 11 * openness));
 
-      // Glow circle around hand strike point (scales with hand openness)
+      // Hand Bounding Box
+      if (detected.right.bbox) {
+        const b = detected.right.bbox;
+        this.debugCtx.strokeStyle = 'rgba(255, 170, 0, 0.45)';
+        this.debugCtx.lineWidth = 1;
+        this.debugCtx.strokeRect(b[0] * dw, b[1] * dh, (b[2] - b[0]) * dw, (b[3] - b[1]) * dh);
+      }
+
+      // Glow circle around hand palm point
       this.debugCtx.strokeStyle = '#ffaa00';
       this.debugCtx.lineWidth = 2;
       this.debugCtx.shadowColor = '#ffaa00';
