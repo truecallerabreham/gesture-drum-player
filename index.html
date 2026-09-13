@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AeroDrum 3D - Gesture-Controlled Air Drumming</title>
+  <meta name="description" content="Play an interactive 3D drum kit in mid-air using webcam hand gestures with zero installation.">
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- External 3D and Computer Vision Dependencies -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <!-- Three.js 3D WebGL Canvas Container -->
+  <div id="canvas-container">
+    <canvas id="three-canvas"></canvas>
+  </div>
+
+  <!-- Raw Webcam Video Feed (Operates invisibly in background for computer vision) -->
+  <video id="webcam-video" autoplay playsinline muted></video>
+
+  <!-- Optional Camera Preview for Calibration / Debugging -->
+  <div id="camera-preview-container">
+    <!-- MediaPipe debug canvas / preview -->
+    <div style="color: #fff; font-size: 10px; padding: 4px; text-align: center; background: rgba(0,0,0,0.6);">Webcam Tracking</div>
+  </div>
+
+  <!-- Heads-Up Display (HUD) -->
+  <div id="hud-overlay">
+    <!-- Header -->
+    <header class="hud-header">
+      <div class="brand-wrapper">
+        <div class="brand-icon">🥁</div>
+        <div>
+          <h1 class="brand-title">AeroDrum 3D</h1>
+          <div class="brand-tagline">Webcam Gesture Air Drums</div>
+        </div>
+      </div>
+
+      <div class="top-controls">
+        <!-- Live Hand Tracking Status Pill -->
+        <div class="status-pill">
+          <span id="status-dot" class="status-dot"></span>
+          <span id="status-text">Position hands in camera</span>
+        </div>
+
+        <!-- Sound Kit Switcher Toggle -->
+        <button id="btn-kit-toggle" class="btn-action btn-kit-toggle" title="Switch Sound Kit">
+          <span>Kit:</span>
+          <span id="kit-name-label" class="kit-badge">Acoustic Rock</span>
+        </button>
+
+        <!-- Camera Preview Toggle Button -->
+        <button id="btn-toggle-cam" class="btn-action" title="Toggle Camera Preview">
+          📷 Cam
+        </button>
+      </div>
+    </header>
+
+    <!-- Center Guidance & Calibration Banner -->
+    <div id="calibration-banner" class="calibration-banner">
+      <div class="banner-title">Raise Hands to Start Drumming</div>
+      <div class="banner-subtitle">
+        Sit comfortably in front of your webcam. Hold your hands up with palms facing forward.
+        Your virtual 3D glowing drumsticks will lock onto your hands.
+      </div>
+      <div class="hand-visualizer-hint">
+        <div class="hint-hand">
+          <span class="hint-hand-icon">✋</span>
+          <span>Left Hand</span>
+        </div>
+        <div class="hint-hand">
+          <span class="hint-hand-icon">✋</span>
+          <span>Right Hand</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Controls & Drum Legend -->
+    <footer class="hud-footer">
+      <div class="drum-legend">
+        <div id="legend-hihat" class="legend-item">
+          <span class="legend-color" style="background: #ffaa00;"></span>
+          <span>Hi-Hat</span>
+        </div>
+        <div id="legend-snare" class="legend-item">
+          <span class="legend-color" style="background: #00f0ff;"></span>
+          <span>Snare</span>
+        </div>
+        <div id="legend-tom1" class="legend-item">
+          <span class="legend-color" style="background: #3388ff;"></span>
+          <span>High Tom</span>
+        </div>
+        <div id="legend-tom2" class="legend-item">
+          <span class="legend-color" style="background: #aa00ff;"></span>
+          <span>Floor Tom</span>
+        </div>
+        <div id="legend-crash" class="legend-item">
+          <span class="legend-color" style="background: #ff0055;"></span>
+          <span>Crash</span>
+        </div>
+        <div id="legend-kick" class="legend-item">
+          <span class="legend-color" style="background: #00ff88;"></span>
+          <span>Kick (Bass)</span>
+        </div>
+      </div>
+
+      <div class="kick-spacebar-hint">
+        <span>Bass Drum:</span>
+        <span class="key-cap">SPACEBAR</span>
+        <span style="color: var(--text-secondary); font-size: 11px;">or strike center pad</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Start Overlay & Audio Permission Modal -->
+  <div id="start-overlay">
+    <div class="modal-content">
+      <div style="font-size: 50px;">🥁✨</div>
+      <h2 class="modal-title">AeroDrum 3D</h2>
+      <p class="modal-description">
+        Play an authentic 3D drum kit in mid-air using your bare hands and your webcam.
+        Zero installation, zero lag, and instant sound.
+      </p>
+
+      <div class="instructions-grid">
+        <div class="instruction-card">
+          <div class="icon">📷</div>
+          <strong>Enable Camera</strong>
+          <div>Allow webcam access for local AI hand tracking</div>
+        </div>
+        <div class="instruction-card">
+          <div class="icon">🖐️</div>
+          <strong>Air Drum</strong>
+          <div>Strike downward naturally to hit virtual drum pads</div>
+        </div>
+        <div class="instruction-card">
+          <div class="icon">⚡</div>
+          <strong>Dual Kick</strong>
+          <div>Tap Spacebar or hit the center pad for deep bass</div>
+        </div>
+      </div>
+
+      <button id="btn-start" class="btn-start">Let's Jam 🚀</button>
+      <div class="camera-disclaimer">
+        🔒 All video is processed 100% locally in your browser. No video is ever recorded or transmitted.
+      </div>
+    </div>
+  </div>
+
+  <!-- Main ES Module Entry Point -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
