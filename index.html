@@ -7,9 +7,9 @@
   <meta name="description" content="Play an interactive 3D drum kit in mid-air using webcam hand gestures with zero installation.">
   <link rel="stylesheet" href="css/style.css">
   
-  <!-- External 3D and Computer Vision Dependencies -->
+  <!-- 3D Graphics Engine -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+  <!-- Zero external computer vision dependencies — 100% native Computer Vision built from scratch -->
 </head>
 <body>
   <!-- Three.js 3D WebGL Canvas Container -->
@@ -20,10 +20,10 @@
   <!-- Raw Webcam Video Feed (Operates invisibly in background for computer vision) -->
   <video id="webcam-video" autoplay playsinline muted></video>
 
-  <!-- Optional Camera Preview for Calibration / Debugging -->
+  <!-- Live Optical Motion Preview for Calibration / Debugging -->
   <div id="camera-preview-container">
-    <!-- MediaPipe debug canvas / preview -->
-    <div style="color: #fff; font-size: 10px; padding: 4px; text-align: center; background: rgba(0,0,0,0.6);">Webcam Tracking</div>
+    <canvas id="cv-debug-canvas" width="160" height="120" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px; display: block;"></canvas>
+    <div style="color: #00f0ff; font-size: 10px; padding: 4px; text-align: center; background: rgba(0,0,0,0.7); font-weight: 700; border-radius: 0 0 6px 6px;">Native CV Motion Heatmap</div>
   </div>
 
   <!-- Heads-Up Display (HUD) -->
@@ -34,7 +34,7 @@
         <div class="brand-icon">🥁</div>
         <div>
           <h1 class="brand-title">AeroDrum 3D</h1>
-          <div class="brand-tagline">Webcam Gesture Air Drums</div>
+          <div class="brand-tagline">Native CV Air Drums</div>
         </div>
       </div>
 
@@ -65,6 +65,11 @@
         <!-- Backing Loop Toggle Button -->
         <button id="btn-loop-toggle" class="btn-action btn-loop-toggle" title="Toggle Backing Rhythm Loop (Key L)">
           ▶️ Backing Loop
+        </button>
+
+        <!-- Sound Test & Audio Unlock Button -->
+        <button id="btn-test-sound" class="btn-action" title="Test & Unlock Audio Output">
+          🔊 Test Sound
         </button>
 
         <!-- Camera Preview Toggle Button -->

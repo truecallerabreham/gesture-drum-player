@@ -68,6 +68,11 @@ class AeroDrumApp {
       }
     });
 
+    const debugCanvas = document.getElementById('cv-debug-canvas');
+    if (debugCanvas && this.handTracker) {
+      this.handTracker.setDebugCanvas(debugCanvas);
+    }
+
     // Start 60fps render loop
     this.animate();
   }
@@ -76,6 +81,8 @@ class AeroDrumApp {
     console.log('[AeroDrumApp] Starting Audio Context...');
     try {
       await this.soundEngine.init();
+      // Play pleasant confirmation chime so user immediately hears audio is working
+      await this.soundEngine.testSound();
     } catch (audioErr) {
       console.warn('[AeroDrumApp] AudioContext init warning:', audioErr);
     }
@@ -84,7 +91,7 @@ class AeroDrumApp {
     this.isRunning = true;
 
     try {
-      console.log('[AeroDrumApp] Initializing Webcam & MediaPipe Hands...');
+      console.log('[AeroDrumApp] Initializing Webcam & Native Computer Vision Engine...');
       const videoElement = await this.cameraManager.start();
       await this.handTracker.start(videoElement);
       console.log('[AeroDrumApp] Air-drumming system is active and tracking hands!');

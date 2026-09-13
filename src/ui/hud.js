@@ -23,6 +23,7 @@ export class HUDController {
     this.cameraPreview = document.getElementById('camera-preview-container');
     this.aimTargetPill = document.getElementById('aim-target-pill');
     this.aimTargetText = document.getElementById('aim-target-text');
+    this.btnTestSound = document.getElementById('btn-test-sound');
 
     this.bindEvents();
     if (this.soundEngine) {
@@ -39,6 +40,13 @@ export class HUDController {
         if (this.onStartClick) {
           this.onStartClick();
         }
+      });
+    }
+
+    if (this.btnTestSound && this.soundEngine) {
+      this.btnTestSound.addEventListener('click', async () => {
+        await this.soundEngine.testSound();
+        this.flashCustomBadge('🔊 AUDIO ACTIVE & UNLOCKED! ✨', 'badge-snare');
       });
     }
 
@@ -147,7 +155,7 @@ export class HUDController {
     } else {
       this.statusDot.className = 'status-dot ready tracking';
       const plural = status.handCount > 1 ? 'Both Hands' : '1 Hand';
-      this.statusText.textContent = `Tracking Active (${plural})`;
+      this.statusText.textContent = `Native CV Active (${plural})`;
       if (this.calibrationBanner) {
         this.calibrationBanner.classList.add('hidden');
       }
@@ -231,5 +239,22 @@ export class HUDController {
       strikeBadge.classList.remove('active');
     }, 280);
   }
+
+  /**
+   * Displays a custom confirmation banner on screen
+   */
+  flashCustomBadge(text, colorClass = 'badge-snare') {
+    const strikeBadge = document.getElementById('live-strike-badge');
+    if (!strikeBadge) return;
+
+    strikeBadge.textContent = text;
+    strikeBadge.className = `live-strike-badge ${colorClass} active`;
+
+    clearTimeout(this._strikeTimeout);
+    this._strikeTimeout = setTimeout(() => {
+      strikeBadge.classList.remove('active');
+    }, 600);
+  }
 }
+
 
