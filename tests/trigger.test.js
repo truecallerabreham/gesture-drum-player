@@ -282,5 +282,28 @@ export function runTriggerTests(runner) {
       trigger.checkStrikes(restingHands, avatar);
       assert.isNull(hit, 'Resting hand at bottom edge is suppressed and does not fire hit');
     });
+
+    runner.test('Strikes outside the drum interactive boundaries do NOT trigger hits', (assert) => {
+      let hit = null;
+      const trigger = new DrumTrigger({
+        drums: { snare: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.0, height: 0.8 } },
+        onHit: (drum, vel, source) => { hit = { drum, vel, source }; }
+      });
+
+      // Hand or head moving downward fast (vy = 0.45) but located far up/away from drum (e.g. at head position y = 1.2, x = 0, z = -0.5)
+      const offTargetHands = {
+        right: {
+          position: { x: 0.5, y: 0.2, z: 0 },
+          velocity: { vy: 0.45, speed: 0.45 }
+        }
+      };
+      const avatar = {
+        getTipPosition: () => ({ x: 0, y: 1.2, z: -0.5 }) // 2.0m away from drum center
+      };
+      const targetedDrums = { right: null }; // Not over drum
+
+      trigger.checkStrikes(offTargetHands, avatar, targetedDrums);
+      assert.isNull(hit, 'Non-targeting strike outside drum bounds is discarded and does not fire hit');
+    });
   });
 }

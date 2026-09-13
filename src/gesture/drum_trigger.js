@@ -107,11 +107,32 @@ export class DrumTrigger {
       if (isMotionStrike && cooldownOk) {
         // Resolve target zone:
         let strikeDrum = targetedDrum;
-        if (!strikeDrum && this.drums.snare && this.drums.snare.center && tipPos) {
-          const distToCenter = MathUtils.distance3D(tipPos, this.drums.snare.center);
-          strikeDrum = distToCenter < 0.60 ? 'snare' : 'rim';
-        } else if (!strikeDrum) {
-          strikeDrum = 'snare';
+        if (!strikeDrum && tipPos) {
+          let closestDrum = null;
+          let minDistance = Infinity;
+
+          for (const [drumName, drum] of Object.entries(this.drums)) {
+            if (!drum || !drum.center) continue;
+            const dist = MathUtils.distance3D(tipPos, drum.center);
+            const reach = (drum.radius || 1.0) * 1.55;
+            if (dist <= reach && dist < minDistance) {
+              minDistance = dist;
+              closestDrum = drumName;
+            }
+          }
+
+          if (closestDrum === 'snare' && this.drums.snare) {
+            strikeDrum = minDistance < 0.60 ? 'snare' : (this.drums.rim ? 'rim' : 'snare');
+          } else if (closestDrum) {
+            strikeDrum = closestDrum;
+          }
+        }
+
+        // Drop strike if gesture is off-target (outside interactive drum reach)
+        if (!strikeDrum) {
+          handState.prevVy = vy;
+          if (tipPos) handState.prevY = tipPos.y;
+          return;
         }
 
         const strokeIntensity = Math.max(vy * 1.5, -vz * 1.2, speed);
