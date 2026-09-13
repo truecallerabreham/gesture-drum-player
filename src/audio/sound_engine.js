@@ -9,22 +9,22 @@ export const BRAZILIAN_SONG_PATTERNS = {
     artist: 'Sérgio Mendes & Carlinhos Brown',
     bpm: 116,
     steps: [
-      { inst: 'surdo', vel: 1.1, label: 'SURDO (Heavy Downbeat 🥁)' },
-      { inst: 'repique', vel: 0.8, label: 'REPIQUE (Stick Tap ⚡)' },
-      { inst: 'repique', vel: 0.95, label: 'REPIQUE (Rim Snap ⚡)' },
-      { inst: 'surdo', vel: 0.9, label: 'SURDO (Answering Boom 🥁)' },
-      { inst: 'tamborim', vel: 0.9, label: 'TAMBORIM (Samba Whip 🪘)' },
-      { inst: 'caixa', vel: 0.8, label: 'CAIXA (Snare Buzz 🥁)' },
-      { inst: 'repique', vel: 1.05, label: 'REPIQUE (Accent Crack ⚡)' },
-      { inst: 'surdo', vel: 0.95, label: 'SURDO (Syncopated Boom 🥁)' },
-      { inst: 'agogo', vel: 0.85, label: 'AGOGÔ (High Bell 🔔)' },
-      { inst: 'repique', vel: 0.8, label: 'REPIQUE (Fast Roll ⚡)' },
-      { inst: 'repique', vel: 0.95, label: 'REPIQUE (Roll Snap ⚡)' },
-      { inst: 'surdo', vel: 1.05, label: 'SURDO (Heavy Boom 🥁)' },
-      { inst: 'tamborim', vel: 0.9, label: 'TAMBORIM (Turnaround 🪘)' },
-      { inst: 'caixa', vel: 0.85, label: 'CAIXA (Carnival Roll 🥁)' },
-      { inst: 'agogo', vel: 0.9, label: 'AGOGÔ (Double Bell 🔔)' },
-      { inst: 'surdo', vel: 1.15, label: 'SURDO (Full Batucada Hit! ✨)' }
+      { inst: 'surdo', note: 392.00, vel: 1.15, label: 'Ê MAGALENHA! (Surdo Boom 🥁)' },
+      { inst: 'repique', note: 466.16, vel: 0.85, label: 'MA-GA- (Repique Tap ⚡)' },
+      { inst: 'repique', note: 523.25, vel: 0.95, label: '-LE-NHA (Repique Snap ⚡)' },
+      { inst: 'surdo', note: 466.16, vel: 0.9, label: 'VEM! (Surdo Answer 🥁)' },
+      { inst: 'tamborim', note: 392.00, vel: 0.9, label: 'DANÇAR (Tamborim Whip 🪘)' },
+      { inst: 'caixa', note: 349.23, vel: 0.8, label: 'VEM (Caixa Buzz 🥁)' },
+      { inst: 'repique', note: 392.00, vel: 1.05, label: 'REQUEBRAR (Repique Crack ⚡)' },
+      { inst: 'surdo', note: 587.33, vel: 0.95, label: 'BATUCADA! (Surdo Boom 🥁)' },
+      { inst: 'agogo', note: 523.25, vel: 0.85, label: 'AGOGÔ BELLS (High Bell 🔔)' },
+      { inst: 'repique', note: 466.16, vel: 0.8, label: 'REPIQUE ROLL (Fast Roll ⚡)' },
+      { inst: 'repique', note: 523.25, vel: 0.95, label: 'CARNIVAL SNAP (Roll Snap ⚡)' },
+      { inst: 'surdo', note: 392.00, vel: 1.05, label: 'Ê VEM! (Surdo Heavy Boom 🥁)' },
+      { inst: 'tamborim', note: 466.16, vel: 0.9, label: 'SAMBA WHIP (Turnaround 🪘)' },
+      { inst: 'caixa', note: 349.23, vel: 0.85, label: 'CAIXA SIZZLE (Carnival Roll 🥁)' },
+      { inst: 'agogo', note: 392.00, vel: 0.9, label: 'CHIME (Double Bell 🔔)' },
+      { inst: 'surdo', note: 784.00, vel: 1.2, label: 'MAGALENHA FINALE! (Full Batucada ✨)' }
     ]
   },
   funk: {
@@ -32,14 +32,14 @@ export const BRAZILIAN_SONG_PATTERNS = {
     artist: 'Viral TikTok Brazilian Beat',
     bpm: 130,
     steps: [
-      { inst: 'tamborzao', vel: 1.2, label: 'TAMBORZÃO (Sub Kick 💥)' },
-      { inst: 'bailesnare', vel: 0.75, label: 'BAILE (Syncopated Tap ⚡)' },
-      { inst: 'bailesnare', vel: 0.95, label: 'BAILE (Rim Crack ⚡)' },
-      { inst: 'tamborzao', vel: 1.05, label: 'TAMBORZÃO (Bounce 💥)' },
-      { inst: 'bailesnare', vel: 0.85, label: 'BAILE (Snap ⚡)' },
-      { inst: 'tamborzao', vel: 0.95, label: 'TAMBORZÃO (Sub Drop 💥)' },
-      { inst: 'bailesnare', vel: 1.1, label: 'BAILE (Heavy Crack ⚡)' },
-      { inst: 'bailesnare', vel: 0.9, label: 'BAILE (Fill Crack ⚡)' }
+      { inst: 'tamborzao', note: 110.0, vel: 1.2, label: 'TAMBORZÃO (Sub Kick 💥)' },
+      { inst: 'bailesnare', note: 110.0, vel: 0.75, label: 'BAILE (Syncopated Tap ⚡)' },
+      { inst: 'bailesnare', note: 146.83, vel: 0.95, label: 'BAILE (Rim Crack ⚡)' },
+      { inst: 'tamborzao', note: 110.0, vel: 1.05, label: 'TAMBORZÃO (Bounce 💥)' },
+      { inst: 'bailesnare', note: 130.81, vel: 0.85, label: 'BAILE (Snap ⚡)' },
+      { inst: 'tamborzao', note: 110.0, vel: 0.95, label: 'TAMBORZÃO (Sub Drop 💥)' },
+      { inst: 'bailesnare', note: 164.81, vel: 1.1, label: 'BAILE (Heavy Crack ⚡)' },
+      { inst: 'bailesnare', note: 146.83, vel: 0.9, label: 'BAILE (Fill Crack ⚡)' }
     ]
   }
 };
@@ -69,6 +69,30 @@ export class SoundEngine {
     this.isInitialized = false;
     this.onPlayCallbacks = [];
     this.onStepCallbacks = [];
+
+    // Auto-unlock audio on any user interaction
+    this.initAutoUnlock();
+  }
+
+  /**
+   * Automatically unlocks AudioContext on the very first user interaction anywhere on page
+   */
+  initAutoUnlock() {
+    if (typeof window === 'undefined') return;
+    const unlockHandler = async () => {
+      try {
+        await this.init();
+        if (this.ctx && this.ctx.state === 'running') {
+          window.removeEventListener('pointerdown', unlockHandler);
+          window.removeEventListener('keydown', unlockHandler);
+          window.removeEventListener('touchstart', unlockHandler);
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('pointerdown', unlockHandler, { passive: true });
+    window.addEventListener('keydown', unlockHandler, { passive: true });
+    window.addEventListener('touchstart', unlockHandler, { passive: true });
   }
 
   /**
@@ -112,6 +136,18 @@ export class SoundEngine {
   }
 
   /**
+   * Explicitly tests and unlocks audio output with a pleasant confirmation chime
+   */
+  async testSound() {
+    await this.init();
+    if (this.ctx && this.compressor) {
+      DrumSynth.playAudioChime(this.ctx, this.compressor);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Switches active sound kit ('magalenha', 'funk', 'acoustic', '808')
    */
   setKit(kitName) {
@@ -142,7 +178,7 @@ export class SoundEngine {
   }
 
   /**
-   * Advance one step in the active song beat sequence
+   * Advance one step in the active song beat sequence, layering percussive hit + viral melody note
    */
   advanceSongBeat(velocity = 1.0) {
     const patternObj = BRAZILIAN_SONG_PATTERNS[this.currentKit] || BRAZILIAN_SONG_PATTERNS.magalenha;
@@ -153,7 +189,19 @@ export class SoundEngine {
     this.songBeatStep++;
 
     const dynamicVel = Math.min(1.0, velocity * (step.vel || 1.0));
+    
+    // 1. Play the authentic percussive instrument
     this.playDirect(step.inst, dynamicVel);
+
+    // 2. Layer the iconic viral melodic hook (brass for Magalenha, phonk bass for Baile Funk)
+    if (this.ctx && this.compressor && step.note) {
+      const now = this.ctx.currentTime;
+      if (this.currentKit === 'magalenha') {
+        DrumSynth.playMagalenhaHorn(this.ctx, this.compressor, step.note, now, dynamicVel * 0.9);
+      } else if (this.currentKit === 'funk') {
+        DrumSynth.playFunkBassRiff(this.ctx, this.compressor, step.note, now, dynamicVel * 0.9);
+      }
+    }
 
     // Dispatch step callback for HUD visualization
     const stepInfo = {
@@ -163,6 +211,7 @@ export class SoundEngine {
       totalSteps: steps.length,
       instrument: step.inst,
       label: step.label,
+      note: step.note || null,
       velocity: dynamicVel
     };
 

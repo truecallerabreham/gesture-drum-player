@@ -686,5 +686,99 @@ export class DrumSynth {
     noise.start(t);
     noise.stop(t + 0.13);
   }
+
+  // =========================================================================
+  // VIRAL SONG MELODIC HOOKS & BRASS RIFFS
+  // =========================================================================
+
+  /**
+   * Brazilian Carnival Brass/Horn Hook for "Magalenha" (Sérgio Mendes)
+   * Dual detuned oscillators with resonant brass envelope
+   */
+  static playMagalenhaHorn(ctx, dest, noteFreq = 392, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+    const duration = 0.28;
+
+    // Dual detuned brass oscillators for rich carnival brass section
+    [1.0, 1.007].forEach((detune, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = idx === 0 ? 'sawtooth' : 'triangle';
+      osc.frequency.setValueAtTime(noteFreq * detune, t);
+
+      // Brass envelope: filter opens quickly then gently decays
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(800, t);
+      filter.frequency.exponentialRampToValueAtTime(3200, t + 0.04);
+      filter.frequency.exponentialRampToValueAtTime(1200, t + duration);
+      filter.Q.setValueAtTime(2.5, t);
+
+      const amp = (idx === 0 ? 0.45 : 0.3) * velocity;
+      gain.gain.setValueAtTime(amp, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(dest);
+
+      osc.start(t);
+      osc.stop(t + duration + 0.02);
+    });
+  }
+
+  /**
+   * Brazilian Baile Funk / Phonk Bass Riff (TikTok viral sound)
+   */
+  static playFunkBassRiff(ctx, dest, noteFreq = 110, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+    const duration = 0.22;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(noteFreq, t);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2800, t);
+    filter.frequency.exponentialRampToValueAtTime(450, t + duration);
+    filter.Q.setValueAtTime(4.0, t);
+
+    gain.gain.setValueAtTime(0.55 * velocity, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(dest);
+
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+  }
+
+  /**
+   * Pleasant audio confirmation chime to verify AudioContext is unlocked
+   */
+  static playAudioChime(ctx, dest, time = 0) {
+    const t = time || ctx.currentTime;
+    [523.25, 659.25, 783.99].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + idx * 0.06);
+
+      gain.gain.setValueAtTime(0.25, t + idx * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.06 + 0.35);
+
+      osc.connect(gain);
+      gain.connect(dest);
+
+      osc.start(t + idx * 0.06);
+      osc.stop(t + idx * 0.06 + 0.38);
+    });
+  }
 }
+
 
