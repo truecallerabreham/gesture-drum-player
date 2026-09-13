@@ -67,70 +67,178 @@ export class DrumKitModels {
   buildKit() {
     const THREE = this.THREE;
 
-    // 1. SNARE DRUM (Center-Left: reachable at x: -0.9, y: -0.2, z: -2.1)
-    this.drums.snare = this.createDrumMesh({
-      radius: 0.65,
-      height: 0.4,
-      pos: new THREE.Vector3(-0.9, -0.2, -2.1),
-      rot: new THREE.Euler(0.1, 0.15, 0),
+    // Single Prominent 3D Concert Snare Drum
+    // Centered directly in front of the drummer with comfortable forward tilt
+    const drumPos = new THREE.Vector3(0, -0.22, -2.05);
+    const drumRot = new THREE.Euler(0.24, 0, 0); // 14-degree ergonomic tilt towards player
+    const drumRadius = 1.05;
+    const drumHeight = 0.52;
+
+    this.singleDrumGroup = new THREE.Group();
+    this.singleDrumGroup.position.copy(drumPos);
+    this.singleDrumGroup.rotation.copy(drumRot);
+
+    // 1. Drum Shell (Midnight lacquer with chrome banding)
+    const shellGeo = new THREE.CylinderGeometry(drumRadius, drumRadius, drumHeight, 48);
+    const shell = new THREE.Mesh(shellGeo, this.matShell);
+    shell.castShadow = true;
+    shell.receiveShadow = true;
+    this.singleDrumGroup.add(shell);
+
+    // Decorative chrome center bead
+    const beadGeo = new THREE.TorusGeometry(drumRadius + 0.005, 0.015, 8, 48);
+    const bead = new THREE.Mesh(beadGeo, this.matChrome);
+    bead.rotation.x = Math.PI / 2;
+    this.singleDrumGroup.add(bead);
+
+    // 2. Top & Bottom Heavy-Duty Chrome Hoops
+    const hoopGeo = new THREE.TorusGeometry(drumRadius + 0.015, 0.038, 12, 48);
+    const topHoop = new THREE.Mesh(hoopGeo, this.matChrome);
+    topHoop.rotation.x = Math.PI / 2;
+    topHoop.position.y = drumHeight * 0.5;
+    this.singleDrumGroup.add(topHoop);
+
+    const bottomHoop = new THREE.Mesh(hoopGeo, this.matChrome);
+    bottomHoop.rotation.x = Math.PI / 2;
+    bottomHoop.position.y = -drumHeight * 0.5;
+    this.singleDrumGroup.add(bottomHoop);
+
+    // 3. Coated White Top Drumhead
+    const headGeo = new THREE.CircleGeometry(drumRadius - 0.01, 48);
+    const topHead = new THREE.Mesh(headGeo, this.matHead);
+    topHead.rotation.x = -Math.PI / 2;
+    topHead.position.y = drumHeight * 0.5 + 0.005;
+    topHead.receiveShadow = true;
+    this.singleDrumGroup.add(topHead);
+
+    // Visual Sweetspot Ring (Center target graphic for drummer clarity)
+    const sweetspotGeo = new THREE.RingGeometry(0.35, 0.38, 48);
+    const sweetspotMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide
+    });
+    const sweetspotRing = new THREE.Mesh(sweetspotGeo, sweetspotMat);
+    sweetspotRing.rotation.x = -Math.PI / 2;
+    sweetspotRing.position.y = drumHeight * 0.5 + 0.008;
+    this.singleDrumGroup.add(sweetspotRing);
+
+    // Center Sweetspot Dot
+    const centerDotGeo = new THREE.CircleGeometry(0.06, 24);
+    const centerDot = new THREE.Mesh(centerDotGeo, sweetspotMat);
+    centerDot.rotation.x = -Math.PI / 2;
+    centerDot.position.y = drumHeight * 0.5 + 0.009;
+    this.singleDrumGroup.add(centerDot);
+
+    // Outer Rimshot Zone Ring
+    const rimZoneGeo = new THREE.RingGeometry(0.85, 0.90, 48);
+    const rimZoneMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa00,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide
+    });
+    const rimZoneRing = new THREE.Mesh(rimZoneGeo, rimZoneMat);
+    rimZoneRing.rotation.x = -Math.PI / 2;
+    rimZoneRing.position.y = drumHeight * 0.5 + 0.008;
+    this.singleDrumGroup.add(rimZoneRing);
+
+    // 4. 10 Chrome Tension Lugs & Tuning Rods
+    const numLugs = 10;
+    const lugGeo = new THREE.CylinderGeometry(0.022, 0.022, drumHeight * 0.65, 8);
+    for (let i = 0; i < numLugs; i++) {
+      const angle = (i / numLugs) * Math.PI * 2;
+      const lugX = Math.cos(angle) * (drumRadius + 0.02);
+      const lugZ = Math.sin(angle) * (drumRadius + 0.02);
+      const lug = new THREE.Mesh(lugGeo, this.matChrome);
+      lug.position.set(lugX, 0, lugZ);
+      this.singleDrumGroup.add(lug);
+    }
+
+    // 5. Snare Throw-off Lever (Side mechanical detail)
+    const strainerGeo = new THREE.BoxGeometry(0.04, 0.16, 0.06);
+    const strainer = new THREE.Mesh(strainerGeo, this.matChrome);
+    strainer.position.set(drumRadius + 0.04, 0, 0);
+    this.singleDrumGroup.add(strainer);
+
+    // 6. Chrome Snare Stand Basket & Legs
+    const basketArmGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.55, 8);
+    for (let i = 0; i < 3; i++) {
+      const armAngle = (i / 3) * Math.PI * 2 + Math.PI / 6;
+      const arm = new THREE.Mesh(basketArmGeo, this.matChrome);
+      arm.position.set(
+        Math.cos(armAngle) * (drumRadius * 0.6),
+        -drumHeight * 0.5 - 0.15,
+        Math.sin(armAngle) * (drumRadius * 0.6)
+      );
+      arm.rotation.z = Math.cos(armAngle) * 0.4;
+      arm.rotation.x = Math.sin(armAngle) * 0.4;
+      this.singleDrumGroup.add(arm);
+    }
+
+    // Telescopic Stand Pole
+    const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.4, 16);
+    const pole = new THREE.Mesh(poleGeo, this.matChrome);
+    pole.position.y = -drumHeight * 0.5 - 0.8;
+    this.singleDrumGroup.add(pole);
+
+    // Heavy-Duty Tripod Base Legs
+    const legGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.1, 12);
+    for (let i = 0; i < 3; i++) {
+      const legAngle = (i / 3) * Math.PI * 2;
+      const leg = new THREE.Mesh(legGeo, this.matChrome);
+      leg.position.set(
+        Math.cos(legAngle) * 0.45,
+        -drumHeight * 0.5 - 1.25,
+        Math.sin(legAngle) * 0.45
+      );
+      leg.rotation.z = Math.cos(legAngle) * 0.7;
+      leg.rotation.x = Math.sin(legAngle) * 0.7;
+      this.singleDrumGroup.add(leg);
+    }
+
+    this.scene.add(this.singleDrumGroup);
+
+    // Center point in 3D world coordinates on the drumhead surface
+    const headCenterWorld = drumPos.clone().add(
+      new THREE.Vector3(0, drumHeight * 0.5, 0).applyEuler(drumRot)
+    );
+
+    // Expose Main Center Drum & Rim Zones
+    this.drums.snare = {
+      group: this.singleDrumGroup,
+      head: topHead,
+      basePos: drumPos.clone(),
+      baseRot: drumRot.clone(),
+      center: headCenterWorld,
+      radius: drumRadius * 1.25,
+      height: 0.8,
       name: 'snare',
-      color: 0x00f0ff
-    });
+      color: 0x00f0ff,
+      isCymbal: false
+    };
 
-    // 2. HI-HAT CYMBALS (Left: reachable at x: -1.8, y: 0.25, z: -2.1)
-    this.drums.hihat = this.createCymbalMesh({
-      radius: 0.6,
-      pos: new THREE.Vector3(-1.8, 0.25, -2.1),
-      rot: new THREE.Euler(0.12, 0.2, 0),
-      name: 'hihat',
-      color: 0xffaa00
-    });
+    this.drums.rim = {
+      group: this.singleDrumGroup,
+      head: topHoop,
+      basePos: drumPos.clone(),
+      baseRot: drumRot.clone(),
+      center: headCenterWorld,
+      radius: drumRadius * 1.35,
+      height: 0.8,
+      name: 'rim',
+      color: 0xffaa00,
+      isCymbal: false
+    };
 
-    // 3. HIGH TOM (Center-Upper Left: reachable at x: -0.55, y: 0.35, z: -2.3)
-    this.drums.tom1 = this.createDrumMesh({
-      radius: 0.55,
-      height: 0.45,
-      pos: new THREE.Vector3(-0.55, 0.35, -2.3),
-      rot: new THREE.Euler(0.3, 0.15, 0),
-      name: 'tom1',
-      color: 0x3388ff
-    });
-
-    // 4. FLOOR / LOW TOM (Center-Right: reachable at x: 1.0, y: -0.2, z: -2.1)
-    this.drums.tom2 = this.createDrumMesh({
-      radius: 0.7,
-      height: 0.5,
-      pos: new THREE.Vector3(1.0, -0.2, -2.1),
-      rot: new THREE.Euler(0.1, -0.15, 0),
-      name: 'tom2',
-      color: 0xaa00ff
-    });
-
-    // 5. CRASH CYMBAL (Right: reachable at x: 1.7, y: 0.5, z: -2.2)
-    this.drums.crash = this.createCymbalMesh({
-      radius: 0.8,
-      pos: new THREE.Vector3(1.7, 0.5, -2.2),
-      rot: new THREE.Euler(0.25, -0.25, 0),
-      name: 'crash',
-      color: 0xff0055
-    });
-
-    // 6. BASS / KICK DRUM (Center Floor visual)
-    this.drums.kick = this.createKickDrumMesh({
-      radius: 1.0,
-      depth: 0.9,
-      pos: new THREE.Vector3(0, -0.75, -2.7),
+    // Virtual Bass kick drum representation for Spacebar
+    this.drums.kick = {
+      group: this.singleDrumGroup,
+      center: headCenterWorld,
       name: 'kick',
-      color: 0x00f0ff
-    });
-
-    // 7. CENTER VIRTUAL KICK HAND-PAD (Reachable floating pad: x: 0, y: -0.55, z: -2.0)
-    this.drums.kickpad = this.createVirtualPadMesh({
-      radius: 0.55,
-      pos: new THREE.Vector3(0, -0.55, -2.0),
-      name: 'kickpad',
-      color: 0x00f0ff
-    });
+      color: 0x00ff88
+    };
   }
 
   createDrumMesh({ radius, height, pos, rot, name, color }) {

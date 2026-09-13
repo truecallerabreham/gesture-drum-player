@@ -137,6 +137,57 @@ export class DrumScene {
     this.drumKit = new DrumKitModels(this.THREE, this.scene);
     this.avatarHands = new AvatarHands(this.THREE, this.scene);
     this.particles = new ParticleEffects(this.THREE, this.scene);
+    this.initShockwaves();
+  }
+
+  initShockwaves() {
+    const THREE = this.THREE;
+    this.ripples = [];
+    const poolSize = 6;
+    for (let i = 0; i < poolSize; i++) {
+      const geo = new THREE.RingGeometry(0.08, 0.16, 48);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 0.52 * 0.5 + 0.015;
+      mesh.visible = false;
+      if (this.drumKit && this.drumKit.singleDrumGroup) {
+        this.drumKit.singleDrumGroup.add(mesh);
+      }
+      this.ripples.push({
+        mesh,
+        mat,
+        active: false,
+        startTime: 0,
+        duration: 380,
+        maxScale: 9.0
+      });
+    }
+  }
+
+  triggerShockwave(color = 0x00f0ff, hitPoint = null) {
+    if (!this.ripples || this.ripples.length === 0) return;
+    const ripple = this.ripples.find(r => !r.active) || this.ripples[0];
+    ripple.active = true;
+    ripple.startTime = performance.now();
+    ripple.mat.color.setHex(color);
+    ripple.mat.opacity = 0.95;
+    ripple.mesh.scale.set(1, 1, 1);
+    ripple.mesh.visible = true;
+
+    if (hitPoint && this.drumKit && this.drumKit.singleDrumGroup) {
+      const local = this.drumKit.singleDrumGroup.worldToLocal(new this.THREE.Vector3(hitPoint.x, hitPoint.y, hitPoint.z));
+      ripple.mesh.position.x = Math.max(-0.85, Math.min(0.85, local.x));
+      ripple.mesh.position.z = Math.max(-0.85, Math.min(0.85, local.z));
+    } else {
+      ripple.mesh.position.x = 0;
+      ripple.mesh.position.z = 0;
+    }
   }
 
   /**
@@ -158,16 +209,18 @@ export class DrumScene {
 
       raycaster.setFromCamera(pointer, this.camera);
 
-      if (this.drumKit && this.drumKit.drums) {
-        for (const [drumName, drum] of Object.entries(this.drumKit.drums)) {
-          if (!drum || !drum.group) continue;
-          const intersects = raycaster.intersectObjects(drum.group.children, true);
-          if (intersects.length > 0) {
-            const mappedName = drumName === 'kickpad' ? 'kick' : drumName;
-            if (this.onPointerHit) {
-              this.onPointerHit(mappedName, 0.95, 'pointer');
-            }
-            break;
+      if (this.drumKit && this.drumKit.singleDrumGroup) {
+        const intersects = raycaster.intersectObjects(this.drumKit.singleDrumGroup.children, true);
+        if (intersects.length > 0) {
+          const hitPoint = intersects[0].point;
+          const snareDrum = this.drumKit.drums.snare;
+          let hitName = 'snare';
+          if (snareDrum && snareDrum.center) {
+            const dist = MathUtils.distance3D(hitPoint, snareDrum.center);
+            hitName = dist < 0.58 ? 'snare' : 'rim';
+          }
+          if (this.onPointerHit) {
+            this.onPointerHit(hitName, 0.95, 'pointer', hitPoint);
           }
         }
       }
@@ -222,7 +275,7 @@ export class DrumScene {
     const pip = new THREE.Mesh(pipGeo, ringMat);
     group.add(pip);
 
-    group.rotation.x = -Math.PI / 2;
+    group.rotation.x = -Math.PI / 2 + 0.24; // Align with tilted drumhead
     group.visible = false;
     this.scene.add(group);
 
@@ -244,19 +297,23 @@ export class DrumScene {
   }
 
   /**
-   * Triggers visual strike feedback (recoil + sparks + light flare)
+   * Triggers visual strike feedback (recoil + sparks + shockwave ripple + light flare)
    */
-  onHit(drumName, velocity = 1.0) {
-    const drum = this.drumKit.drums[drumName] || (drumName === 'kick' ? this.drumKit.drums.kickpad : null);
+  onHit(drumName, velocity = 1.0, position = null) {
+    const drum = this.drumKit.drums[drumName] || (drumName === 'kick' ? this.drumKit.drums.kick : null);
     if (!drum) return;
 
     // 1. Recoil physical animation
     this.drumKit.triggerRecoil(drumName, velocity);
 
     // 2. Neon particle burst
-    this.particles.emitBurst(drum.center, drum.color, 35, velocity);
+    const burstPoint = position || drum.center;
+    this.particles.emitBurst(burstPoint, drum.color, 35, velocity);
 
-    // 3. Dynamic stage light pulse
+    // 3. Drumhead shockwave ripple
+    this.triggerShockwave(drum.color, position);
+
+    // 4. Dynamic stage light pulse
     this.flashLight.color.setHex(drum.color);
     this.flashLight.intensity = 2.5 * velocity;
   }
@@ -285,45 +342,41 @@ export class DrumScene {
 
         let bestHit = null;
         let bestDrumName = null;
-        let bestDist = Infinity;
 
-        if (this.drumKit && this.drumKit.drums) {
-          for (const [drumName, drum] of Object.entries(this.drumKit.drums)) {
-            if (!drum || !drum.center) continue;
+        const snareDrum = this.drumKit && this.drumKit.drums ? this.drumKit.drums.snare : null;
+        if (snareDrum && snareDrum.center) {
+          const normal = new THREE.Vector3(0, 1, 0).applyEuler(snareDrum.baseRot || new THREE.Euler(0.24, 0, 0));
+          const discHit = MathUtils.rayIntersectsDisc(
+            aimRay.origin,
+            aimRay.direction,
+            snareDrum.center,
+            1.25, // full drumhead radius including rim
+            normal
+          );
 
-            // Disc surface intersection
-            const discHit = MathUtils.rayIntersectsDisc(
-              aimRay.origin,
-              aimRay.direction,
-              drum.center,
-              drum.radius * 1.35,
-              { x: 0, y: 1, z: 0 }
-            );
-
-            if (discHit && discHit.distance < bestDist) {
-              bestDist = discHit.distance;
-              bestHit = discHit.hitPoint;
-              bestDrumName = drumName === 'kickpad' ? 'kick' : drumName;
-            } else if (!bestHit) {
-              // Proximity angle fallback
-              const rayDist = MathUtils.rayDistanceToPoint(aimRay.origin, aimRay.direction, drum.center);
-              if (rayDist < drum.radius * 1.25) {
-                bestHit = drum.center;
-                bestDrumName = drumName === 'kickpad' ? 'kick' : drumName;
-              }
+          if (discHit) {
+            bestHit = discHit.hitPoint;
+            // Radius < 0.58m is Center Sweetspot (Snare), >= 0.58m is Chrome Rim (Rimshot)
+            bestDrumName = discHit.distToCenter < 0.58 ? 'snare' : 'rim';
+          } else {
+            // Proximity fallback if pointing roughly at drum
+            const rayDist = MathUtils.rayDistanceToPoint(aimRay.origin, aimRay.direction, snareDrum.center);
+            if (rayDist < 1.35) {
+              bestHit = snareDrum.center;
+              bestDrumName = 'snare';
             }
           }
         }
 
         if (bestHit && bestDrumName) {
-          reticle.group.position.set(bestHit.x, bestHit.y + 0.02, bestHit.z);
+          reticle.group.position.set(bestHit.x, bestHit.y + 0.015, bestHit.z);
           reticle.group.visible = true;
 
           // Pulse animation
           const pulse = 1.0 + 0.08 * Math.sin(now * 0.01);
           reticle.group.scale.set(pulse, pulse, pulse);
 
-          const drum = this.drumKit.drums[bestDrumName] || this.drumKit.drums.kickpad;
+          const drum = this.drumKit.drums[bestDrumName];
           if (drum && drum.color) {
             reticle.ringMat.color.setHex(drum.color);
           }
@@ -353,12 +406,29 @@ export class DrumScene {
       this.particles.update(dt);
     }
 
-    // 4. Decay flash light
+    // 4. Update shockwave ripples
+    if (this.ripples) {
+      for (const ripple of this.ripples) {
+        if (!ripple.active) continue;
+        const elapsed = now - ripple.startTime;
+        if (elapsed >= ripple.duration) {
+          ripple.active = false;
+          ripple.mesh.visible = false;
+        } else {
+          const progress = elapsed / ripple.duration;
+          const scale = 1.0 + progress * ripple.maxScale;
+          ripple.mesh.scale.set(scale, scale, 1.0);
+          ripple.mat.opacity = (1.0 - progress) * 0.95;
+        }
+      }
+    }
+
+    // 5. Decay flash light
     if (this.flashLight && this.flashLight.intensity > 0.01) {
       this.flashLight.intensity *= 0.85;
     }
 
-    // 5. Render
+    // 6. Render
     this.renderer.render(this.scene, this.camera);
   }
 }
