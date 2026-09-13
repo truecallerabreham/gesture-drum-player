@@ -77,5 +77,31 @@ export function runVisionTests(runner) {
       const droppedHand = tracker.decayHandState('right', 0.016, 600);
       assert.isNull(droppedHand, 'Hand state cleanly deactivates after 400ms absence');
     });
+
+    runner.test('NativeCVTracker extracts 3D orientation, openness, and depth coordinates', (assert) => {
+      const tracker = new NativeCVTracker();
+
+      // Simulate a hand with tilted wrist roll and wide open fingers
+      const hand = tracker.updateHandState('left', 0.35, 0.45, 0.48, [0.25, 0.35, 0.45, 0.55], 0.016, 100, {
+        roll: 0.38,
+        openness: 1.45,
+        handScale: 1.6
+      });
+
+      assert.isNotNull(hand, 'Hand state created');
+      assert.isNotNull(hand.rotation, 'Rotation object exists');
+      assert.isTrue(hand.rotation.roll > 0.15, 'Wrist roll angle is captured');
+      assert.isTrue(hand.openness > 1.2, 'Hand openness indicates splayed fingers');
+      assert.isTrue(hand.position.z > 0.1, 'Depth Z reflects forward distance from camera');
+      assert.equal(hand.landmarks.length, 21, 'Generates full 21-joint skeleton');
+
+      // Test synthetic landmarks rotate with roll and spread with openness
+      const rolledLandmarks = tracker.generateSyntheticLandmarks(0.5, 0.5, 0.55, 'left', 0.5, 1.5);
+      const neutralLandmarks = tracker.generateSyntheticLandmarks(0.5, 0.5, 0.55, 'left', 0, 1.0);
+
+      assert.equal(rolledLandmarks.length, 21, '21 landmarks in rolled hand');
+      // Due to roll tilt, x-coordinates of fingertips differ from neutral
+      assert.isTrue(rolledLandmarks[12].x !== neutralLandmarks[12].x, 'Middle fingertip X rotated by roll angle');
+    });
   });
 }
