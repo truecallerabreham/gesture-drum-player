@@ -27,16 +27,15 @@ export class DrumTrigger {
     const keyMap = {
       'Digit1': 'snare',
       'KeyS': 'snare',
-      'Digit2': 'hihat',
-      'KeyH': 'hihat',
-      'Digit3': 'tom1',
-      'KeyT': 'tom1',
-      'Digit4': 'tom2',
-      'KeyF': 'tom2',
-      'Digit5': 'crash',
-      'KeyC': 'crash',
+      'Digit2': 'rim',
+      'KeyR': 'rim',
       'Space': 'kick',
-      'KeyB': 'kick'
+      'KeyB': 'kick',
+      'Digit3': 'kick',
+      'KeyH': 'rim',
+      'KeyT': 'snare',
+      'KeyF': 'snare',
+      'KeyC': 'rim'
     };
 
     window.addEventListener('keydown', (e) => {
@@ -91,35 +90,64 @@ export class DrumTrigger {
       }
 
       // 2. PROXIMITY CYLINDER FALLBACK: When physically tapping inside drum volume
-      for (const [drumName, drum] of Object.entries(this.drums)) {
-        if (!drum || !drum.center) continue;
-
-        if (!this.padStates[drumName]) {
-          this.padStates[drumName] = {
+      const snareDrum = this.drums.snare;
+      if (snareDrum && snareDrum.center && this.drums.rim) {
+        if (!this.padStates['singleDrum']) {
+          this.padStates['singleDrum'] = {
             lastHitTime: -10000,
             wasInside: { left: false, right: false }
           };
         }
-        const state = this.padStates[drumName];
-
+        const state = this.padStates['singleDrum'];
         const isInside = MathUtils.pointInCylinder(
           tipPos,
-          drum.center,
-          drum.radius,
-          drum.height
+          snareDrum.center,
+          snareDrum.radius,
+          snareDrum.height
         );
-
         const cooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
         const wasInside = state.wasInside[side];
 
         if (isInside && !wasInside && isDownwardStroke && cooldownOk) {
           const hitVelocity = MathUtils.mapRange(vy, this.minDownwardVelocity, 5.0, 0.4, 1.0, true);
           state.lastHitTime = now;
-          const mappedName = drumName === 'kickpad' ? 'kick' : drumName;
-          this.triggerHit(mappedName, hitVelocity, side, tipPos);
+          const distToCenter = MathUtils.distance3D(tipPos, snareDrum.center);
+          const hitName = distToCenter < 0.58 ? 'snare' : 'rim';
+          this.triggerHit(hitName, hitVelocity, side, tipPos);
         }
-
         state.wasInside[side] = isInside;
+      } else {
+        // Generic dictionary fallback for test mocks or other drum setups
+        for (const [drumName, drum] of Object.entries(this.drums)) {
+          if (!drum || !drum.center) continue;
+
+          if (!this.padStates[drumName]) {
+            this.padStates[drumName] = {
+              lastHitTime: -10000,
+              wasInside: { left: false, right: false }
+            };
+          }
+          const state = this.padStates[drumName];
+
+          const isInside = MathUtils.pointInCylinder(
+            tipPos,
+            drum.center,
+            drum.radius,
+            drum.height
+          );
+
+          const cooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
+          const wasInside = state.wasInside[side];
+
+          if (isInside && !wasInside && isDownwardStroke && cooldownOk) {
+            const hitVelocity = MathUtils.mapRange(vy, this.minDownwardVelocity, 5.0, 0.4, 1.0, true);
+            state.lastHitTime = now;
+            const mappedName = drumName === 'kickpad' ? 'kick' : drumName;
+            this.triggerHit(mappedName, hitVelocity, side, tipPos);
+          }
+
+          state.wasInside[side] = isInside;
+        }
       }
     });
   }
