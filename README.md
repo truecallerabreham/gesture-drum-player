@@ -7,7 +7,7 @@
 [![3D Engine](https://img.shields.io/badge/3D%20Graphics-Three.js-black?style=for-the-badge&logo=three.js)](https://threejs.org/)
 [![Native CV](https://img.shields.io/badge/Vision-Native%20Canvas%20CV-00ff88?style=for-the-badge)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
 [![Web Audio](https://img.shields.io/badge/Audio-Web%20Audio%20API-ff0077?style=for-the-badge)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
-[![Tests](https://img.shields.io/badge/Tests-26%2F26%20Passing-brightgreen?style=for-the-badge)](https://github.com/truecallerabreham/gesture-drum-player)
+[![Tests](https://img.shields.io/badge/Tests-30%2F30%20Passing-brightgreen?style=for-the-badge)](https://github.com/truecallerabreham/gesture-drum-player)
 
 ---
 
@@ -18,20 +18,22 @@
 - **5 Multi-Jointed Articulated Fingers**: Thumb, Index, Middle, Ring, and Pinky with realistic proportions, individual knuckle joints (MCP, PIP, DIP), fleshy fingertip pads, and translucent fingernail plates.
 - **True Bilateral Symmetry**: Left hand and Right hand feature anatomically accurate opposing thumbs and finger ordering.
 - **Real-Time Motion Replication**:
-  - **3D Position $(X, Y, Z)$**: Mirrors your real hand's horizontal and vertical movement across the drum, plus forward/backward depth ($Z$).
+  - **3D Position $(X, Y, Z)$**: Directly mirrors your real hand's horizontal and vertical movement across the drum, plus forward/backward depth ($Z$).
   - **Wrist Roll & Tilt**: Central spatial moments ($\mu_{20}, \mu_{02}, \mu_{11}$) extract the exact tilt angle of your wrist in real time ($\theta_{\text{roll}}$).
   - **Finger Flexion**: Open hand splays and flattens fingers; clenching a fist or striking curls all 5 fingers through their 3 joint segments into a natural grip.
   - **Kinematic Strike Snapping**: When your hand snaps down, the wrist flexes dynamically and strikes the drumhead with realistic recoil.
 
-### 🌐 2. Play Anywhere (Full Screen & Full Drumhead)
-- **Adaptive Density Clustering**: Eliminates rigid half-screen boundaries!
-- **Play With One Hand Anywhere**: Move a single hand freely across the entire screen — from the left rim to the dead center sweetspot to the right rim — without your hand ever being split in half or lost.
-- **Seamless Dual-Hand Drumming**: When both hands enter the frame, adaptive valley separation dynamically places the boundary in the open space between your hands.
+### 🌐 2. 2D Spatial Blob Tracking & Stationary Face Suppression
+- **2D Macrocell Grid ($40 \times 30$)**: Replaces simplistic 1D projections with full 2D spatial clustering, isolating true hand blobs in $(X, Y)$ coordinates.
+- **Stationary Face & Neck Suppression**: Automatically detects the stationary head/face in the upper-central camera frame and filters it out, ensuring the sitting user's face never anchors or hijacks hand tracking!
+- **Play Anywhere Across Full Screen**: Move a single hand freely across the entire field of view — from left rim to center sweetspot to right rim — without getting lost or locked to one side.
+- **Seamless Dual-Hand Drumming**: Automatically segments and tracks both hands simultaneously with independent kinematic velocities.
 
-### 👁️ 3. 100% Native Computer Vision (Zero External Dependencies)
+### 👁️ 3. 100% Native Computer Vision & Responsive Strike Physics
 - **Zero MediaPipe / Zero WASM**: Operates directly on HTML5 Canvas pixels with sub-millisecond execution ($<1\text{ ms}$) at a silky-smooth **60+ FPS**.
-- **Brightness-Invariant YCbCr Chrominance Plane**: Segmenting skin in the $Cb\text{--}Cr$ color plane ($132 \le Cr \le 180$, $77 \le Cb \le 135$) keeps hands locked and tracked even when held completely stationary in mid-air under any room lighting.
-- **Directional Optical Flow Kinematics**: Isolates instantaneous downward strike velocity $v_y = \frac{\Delta y}{\Delta t}$, preventing false hits when moving sideways or upward.
+- **Brightness-Invariant YCbCr Chrominance**: Segmenting skin in the $Cb\text{--}Cr$ color plane keeps hands locked even when stationary in mid-air under diverse room lighting.
+- **Natural Strike Inflection Physics**: Detects real drumming strikes through downstroke velocity ($v_y > 0.18$), bottom-of-stroke deceleration/rebound inflection ($v_y^{\text{prev}} > 0.14 \to v_y \le 0.05$), and 3D drumhead plane crossing.
+- **Resting Hand Filter**: Putting your hands down to rest on your desk no longer triggers accidental hits.
 
 ### 🇧🇷 4. Viral Brazilian Music Beats
 - **"Magalenha" by Sérgio Mendes & Carlinhos Brown**: The iconic viral Brazilian carnival anthem! Move your hands to play the authentic Batucada rhythm:
