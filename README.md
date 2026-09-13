@@ -157,6 +157,9 @@ node tests/run_tests.js
   ✅ triggerHit dispatches keyboard strikes for full kit (4 assertions)
   ✅ Single drum differentiates Center Sweetspot vs Rimshot by strike distance (4 assertions)
   ✅ Rapid alternating two-hand strikes trigger independently without blocking (3 assertions)
+  ✅ Inflection rebound triggers hit when stroke decelerates at bottom of strike (2 assertions)
+  ✅ Resting hands at bottom of camera do not trigger accidental hits (1 assertions)
+  ✅ Strikes outside the drum interactive boundaries do NOT trigger hits (1 assertions)
 
 📦 Suite: SoundEngine Audio Graph & Routing
   ✅ SoundEngine defaults to Magalenha kit and cycles through all kits (5 assertions)
@@ -175,10 +178,37 @@ node tests/run_tests.js
   ✅ NativeCVTracker maintains hand tracking persistence during mid-air stillness (4 assertions)
   ✅ NativeCVTracker extracts 3D orientation, openness, and depth coordinates (8 assertions)
   ✅ NativeCVTracker supports full-screen play anywhere across entire drumhead (4 assertions)
+  ✅ NativeCVTracker initializes 2D macrocell grid and suppresses stationary upper face (5 assertions)
+  ✅ NativeCVTracker tracks palm centroid and strike tip independently (4 assertions)
+  ✅ NativeCVTracker strictly rejects moving head blobs from hand tracking (3 assertions)
 
 ----------------------------------------
-Summary: 26 passed, 0 failed out of 26 tests.
+Summary: 32 passed, 0 failed out of 32 tests.
 ----------------------------------------
+```
+
+---
+
+## 🚀 Deployment & Local Setup
+
+### Live Production Deployment
+- **URL**: [https://truecallerabreham.github.io/gesture-drum-player/](https://truecallerabreham.github.io/gesture-drum-player/)
+- **Hosting**: Deployed directly via **GitHub Pages** from the `main` branch root (`/`) with HTTPS enabled and continuous live builds.
+- **Repository**: [https://github.com/truecallerabreham/gesture-drum-player](https://github.com/truecallerabreham/gesture-drum-player)
+
+### Local Development Server
+To run locally on your machine:
+```bash
+# Clone the repository
+git clone https://github.com/truecallerabreham/gesture-drum-player.git
+cd gesture-drum-player
+
+# Start a local static server
+python -m http.server 8000
+# or: npx serve .
+
+# Open in your browser
+# http://localhost:8000
 ```
 
 ---
