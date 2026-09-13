@@ -162,5 +162,53 @@ export function runTriggerTests(runner) {
       assert.equal(hits[1].drum, 'hihat', 'Second hit was hihat');
       assert.equal(hits[2].drum, 'kick', 'Third hit was kick');
     });
+
+    runner.test('Single drum differentiates Center Sweetspot vs Rimshot by strike distance', (assert) => {
+      let struck = null;
+      const trigger = new DrumTrigger({
+        drums: {
+          snare: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.05, height: 0.8 },
+          rim: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.15, height: 0.8 }
+        },
+        onHit: (drum, vel, source) => {
+          struck = { drum, vel, source };
+        }
+      });
+
+      // 1. Center hit (distance 0.2m from center < 0.58m)
+      const mockCenterTip = {
+        right: { velocity: { vy: 0.6 } }
+      };
+      const mockCenterAvatar = {
+        getTipPosition: () => ({ x: 0.1, y: 0.05, z: -2.0 })
+      };
+      trigger.checkStrikes(mockCenterTip, mockCenterAvatar);
+      assert.isNotNull(struck, 'Center hit triggered');
+      assert.equal(struck.drum, 'snare', 'Hit inside center sweetspot triggers snare');
+
+      // Reset
+      struck = null;
+
+      // 2. Rim hit (distance 0.8m from center >= 0.58m)
+      const trigger2 = new DrumTrigger({
+        drums: {
+          snare: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.05, height: 0.8 },
+          rim: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.15, height: 0.8 }
+        },
+        onHit: (drum, vel, source) => {
+          struck = { drum, vel, source };
+        }
+      });
+
+      const mockRimTip = {
+        right: { velocity: { vy: 0.6 } }
+      };
+      const mockRimAvatar = {
+        getTipPosition: () => ({ x: 0.8, y: 0.05, z: -2.0 })
+      };
+      trigger2.checkStrikes(mockRimTip, mockRimAvatar);
+      assert.isNotNull(struck, 'Rim hit triggered');
+      assert.equal(struck.drum, 'rim', 'Hit near perimeter triggers rimshot');
+    });
   });
 }

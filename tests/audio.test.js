@@ -44,5 +44,24 @@ export function runAudioTests(runner) {
       engine.play('kick', -0.5);
       assert.equal(capturedVel, 0.1, 'Negative velocity clamped to minimum 0.1');
     });
+
+    runner.test('SoundEngine routes rim and rimshot correctly', (assert) => {
+      const engine = new SoundEngine();
+      let lastHit = null;
+
+      engine.onPlay((inst, vel, kit) => {
+        lastHit = { inst, vel, kit };
+      });
+
+      engine.play('rim', 0.95);
+      assert.isNotNull(lastHit, 'Rim played');
+      assert.equal(lastHit.inst, 'rim', 'Instrument is rim');
+      assert.equal(lastHit.kit, 'acoustic', 'Kit is acoustic');
+
+      engine.setKit('808');
+      engine.play('rimshot', 0.8);
+      assert.equal(lastHit.inst, 'rimshot', 'Instrument is rimshot');
+      assert.equal(lastHit.kit, '808', 'Kit is 808');
+    });
   });
 }
