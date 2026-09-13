@@ -8,11 +8,18 @@ export class DrumTrigger {
     this.drums = options.drums || {};
     this.onHitCallback = options.onHit || null;
 
-    // Thresholds
-    this.minDownwardVelocity = 1.0; // units/sec downward
-    this.refractoryPeriod = 85; // ms cooldown per drum pad
+    // Responsive thresholds for bare hand movements
+    this.minDownwardVelocity = 0.22; // sensitive downward movement threshold
+    this.minGestureSpeed = 0.35;    // sensitive overall gesture speed
+    this.refractoryPeriod = 42;     // ms cooldown per hand to allow rapid drumming/rolls
 
-    // State per drum: { lastHitTime: 0, wasInside: { left: false, right: false } }
+    // State per hand for independent two-handed playing
+    this.handStates = {
+      left: { lastHitTime: -10000, prevVy: 0, wasInside: false },
+      right: { lastHitTime: -10000, prevVy: 0, wasInside: false }
+    };
+
+    // State per drum pad for test backward compatibility
     this.padStates = {};
 
     // Bind keyboard kick
@@ -49,9 +56,9 @@ export class DrumTrigger {
   }
 
   /**
-   * Checks for drum strikes based on current pen tip positions, aim targets, and velocities
+   * Checks for drum strikes based on bare hand positions and velocities
    * @param {Object} detectedHands - { left, right }
-   * @param {AvatarHands} avatarHands - Avatar drumsticks instance with 3D tip positions
+   * @param {AvatarHands} avatarHands - Avatar hands instance with 3D tip positions
    * @param {Object} targetedDrums - { left: drumName, right: drumName }
    */
   checkStrikes(detectedHands, avatarHands, targetedDrums = {}) {
@@ -59,95 +66,91 @@ export class DrumTrigger {
 
     ['left', 'right'].forEach(side => {
       const hand = detectedHands[side];
-      if (!hand || !avatarHands) return;
+      if (!hand) return;
 
-      const tipPos = avatarHands.getTipPosition(side);
-      if (!tipPos) return;
+      const tipPos = avatarHands && typeof avatarHands.getTipPosition === 'function'
+        ? avatarHands.getTipPosition(side)
+        : (hand.position || null);
 
-      // In screen coordinates, y increases downward, so downward movement has positive vy
-      const vy = hand.velocity ? hand.velocity.vy * 4.0 : 0;
-      const vz = hand.velocity ? hand.velocity.vz * 4.0 : 0;
+      if (!this.handStates[side]) {
+        this.handStates[side] = { lastHitTime: -10000, prevVy: 0, wasInside: false };
+      }
+      const handState = this.handStates[side];
+
+      // Hand velocity components (screen coordinates: positive vy = downward motion)
+      const vy = hand.velocity ? hand.velocity.vy : 0;
+      const vz = hand.velocity ? hand.velocity.vz : 0;
+      const vx = hand.velocity ? hand.velocity.vx : 0;
+      const speed = hand.velocity && hand.velocity.speed !== undefined
+        ? hand.velocity.speed
+        : Math.sqrt(vx * vx + vy * vy + vz * vz);
+
+      // 1. Every-Movement Detection Criteria:
+      // a) Direct downward stroke
       const isDownwardStroke = vy > this.minDownwardVelocity;
-      const isForwardPlunge = vz < -this.minDownwardVelocity * 0.75;
-      const isStrikeGesture = isDownwardStroke || isForwardPlunge;
+      // b) Rebound/deceleration at bottom of stroke (drum hit inflection)
+      const isInflectionRebound = handState.prevVy > 0.20 && vy < (handState.prevVy - 0.12);
+      // c) Fast forward plunge or wrist snap
+      const isPlungeSnap = vz < -0.25 || speed > this.minGestureSpeed;
 
-      // 1. AIM-AND-STRIKE: If the pen laser ray is aiming at a drum
+      const isMotionStrike = isDownwardStroke || isInflectionRebound || isPlungeSnap;
+      const cooldownOk = (now - handState.lastHitTime) > this.refractoryPeriod;
+
+      // Check targeting or position over the drum
       const targetedDrum = targetedDrums ? targetedDrums[side] : null;
-      if (targetedDrum && isStrikeGesture) {
-        if (!this.padStates[targetedDrum]) {
-          this.padStates[targetedDrum] = { lastHitTime: -10000, wasInside: { left: false, right: false } };
-        }
-        const state = this.padStates[targetedDrum];
-        const cooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
 
-        if (cooldownOk) {
-          const strokeSpeed = Math.max(vy, -vz);
-          const hitVelocity = MathUtils.mapRange(strokeSpeed, this.minDownwardVelocity, 5.0, 0.45, 1.0, true);
-          state.lastHitTime = now;
-          this.triggerHit(targetedDrum, hitVelocity, `${side}-pen`, tipPos);
-          return;
+      if (isMotionStrike && cooldownOk) {
+        // Resolve target zone:
+        let strikeDrum = targetedDrum;
+        if (!strikeDrum && this.drums.snare && this.drums.snare.center && tipPos) {
+          const distToCenter = MathUtils.distance3D(tipPos, this.drums.snare.center);
+          strikeDrum = distToCenter < 0.60 ? 'snare' : 'rim';
+        } else if (!strikeDrum) {
+          strikeDrum = 'snare';
         }
+
+        const strokeIntensity = Math.max(vy * 1.5, -vz * 1.2, speed);
+        const hitVelocity = MathUtils.mapRange(strokeIntensity, this.minDownwardVelocity, 3.5, 0.35, 1.0, true);
+
+        handState.lastHitTime = now;
+        handState.prevVy = vy;
+
+        this.triggerHit(strikeDrum, hitVelocity, side, tipPos);
+        return;
       }
 
-      // 2. PROXIMITY CYLINDER FALLBACK: When physically tapping inside drum volume
-      const snareDrum = this.drums.snare;
-      if (snareDrum && snareDrum.center && this.drums.rim) {
-        if (!this.padStates['singleDrum']) {
-          this.padStates['singleDrum'] = {
+      handState.prevVy = vy;
+
+      // 2. Proximity cylinder fallback for legacy tests
+      for (const [drumName, drum] of Object.entries(this.drums)) {
+        if (!drum || !drum.center || !tipPos) continue;
+
+        if (!this.padStates[drumName]) {
+          this.padStates[drumName] = {
             lastHitTime: -10000,
             wasInside: { left: false, right: false }
           };
         }
-        const state = this.padStates['singleDrum'];
+        const state = this.padStates[drumName];
+
         const isInside = MathUtils.pointInCylinder(
           tipPos,
-          snareDrum.center,
-          snareDrum.radius,
-          snareDrum.height
+          drum.center,
+          drum.radius,
+          drum.height
         );
-        const cooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
+
+        const padCooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
         const wasInside = state.wasInside[side];
 
-        if (isInside && !wasInside && isDownwardStroke && cooldownOk) {
-          const hitVelocity = MathUtils.mapRange(vy, this.minDownwardVelocity, 5.0, 0.4, 1.0, true);
+        if (isInside && !wasInside && vy > this.minDownwardVelocity && padCooldownOk) {
+          const hitVelocity = MathUtils.mapRange(vy, this.minDownwardVelocity, 3.5, 0.4, 1.0, true);
           state.lastHitTime = now;
-          const distToCenter = MathUtils.distance3D(tipPos, snareDrum.center);
-          const hitName = distToCenter < 0.58 ? 'snare' : 'rim';
-          this.triggerHit(hitName, hitVelocity, side, tipPos);
+          const mappedName = drumName === 'kickpad' ? 'kick' : drumName;
+          this.triggerHit(mappedName, hitVelocity, side, tipPos);
         }
+
         state.wasInside[side] = isInside;
-      } else {
-        // Generic dictionary fallback for test mocks or other drum setups
-        for (const [drumName, drum] of Object.entries(this.drums)) {
-          if (!drum || !drum.center) continue;
-
-          if (!this.padStates[drumName]) {
-            this.padStates[drumName] = {
-              lastHitTime: -10000,
-              wasInside: { left: false, right: false }
-            };
-          }
-          const state = this.padStates[drumName];
-
-          const isInside = MathUtils.pointInCylinder(
-            tipPos,
-            drum.center,
-            drum.radius,
-            drum.height
-          );
-
-          const cooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
-          const wasInside = state.wasInside[side];
-
-          if (isInside && !wasInside && isDownwardStroke && cooldownOk) {
-            const hitVelocity = MathUtils.mapRange(vy, this.minDownwardVelocity, 5.0, 0.4, 1.0, true);
-            state.lastHitTime = now;
-            const mappedName = drumName === 'kickpad' ? 'kick' : drumName;
-            this.triggerHit(mappedName, hitVelocity, side, tipPos);
-          }
-
-          state.wasInside[side] = isInside;
-        }
       }
     });
   }
