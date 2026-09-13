@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AeroDrum 3D - Browser Test Suite</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0c0e1c; color: #fff; padding: 30px; }
+    h1 { color: #00f0ff; margin-bottom: 20px; }
+    .suite { background: #14182b; border: 1px solid #232a48; border-radius: 8px; padding: 18px; margin-bottom: 20px; }
+    .suite-title { font-size: 16px; font-weight: bold; color: #ffaa00; margin-bottom: 12px; }
+    .test { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .pass { color: #00ff88; }
+    .fail { color: #ff0077; }
+    .summary { font-size: 16px; font-weight: bold; padding: 15px; border-radius: 8px; margin-top: 20px; background: #182038; }
+  </style>
+</head>
+<body>
+  <h1>🥁 AeroDrum 3D Test Runner</h1>
+  <div id="results"></div>
+
+  <script type="module">
+    class BrowserRunner {
+      constructor() {
+        this.resultsEl = document.getElementById('results');
+        this.total = 0;
+        this.passed = 0;
+        this.failed = 0;
+      }
+
+      suite(name, fn) {
+        const suiteEl = document.createElement('div');
+        suiteEl.className = 'suite';
+        const titleEl = document.createElement('div');
+        titleEl.className = 'suite-title';
+        titleEl.textContent = '📦 ' + name;
+        suiteEl.appendChild(titleEl);
+        this.resultsEl.appendChild(suiteEl);
+        this.currentSuiteEl = suiteEl;
+        fn();
+      }
+
+      test(name, fn) {
+        this.total++;
+        const testEl = document.createElement('div');
+        testEl.className = 'test';
+
+        const assert = {
+          equal: (a, b, msg) => { if (a !== b) throw new Error(`${msg}: expected ${b}, got ${a}`); },
+          isTrue: (v, msg) => { if (v !== true) throw new Error(msg || 'Expected true'); },
+          isFalse: (v, msg) => { if (v !== false) throw new Error(msg || 'Expected false'); },
+          isNotNull: (v, msg) => { if (v === null || v === undefined) throw new Error(msg || 'Expected non-null'); }
+        };
+
+        try {
+          fn(assert);
+          this.passed++;
+          testEl.innerHTML = `<span class="pass">✅</span> <span>${name}</span>`;
+        } catch (err) {
+          this.failed++;
+          testEl.innerHTML = `<span class="fail">❌</span> <span>${name} - ${err.message}</span>`;
+        }
+        this.currentSuiteEl.appendChild(testEl);
+      }
+    }
+
+    import { runTriggerTests } from './trigger.test.js';
+    import { runAudioTests } from './audio.test.js';
+
+    const runner = new BrowserRunner();
+    runTriggerTests(runner);
+    runAudioTests(runner);
+
+    const summary = document.createElement('div');
+    summary.className = 'summary';
+    summary.innerHTML = `Tests Completed: <span style="color: #00ff88;">${runner.passed} Passed</span>, <span style="color: #ff0077;">${runner.failed} Failed</span> out of ${runner.total} tests.`;
+    document.body.appendChild(summary);
+  </script>
+</body>
+</html>
