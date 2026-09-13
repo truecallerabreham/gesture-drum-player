@@ -83,7 +83,7 @@ export class HUDController {
   updateTargetDisplay(targetDrum) {
     if (!this.aimTargetText) return;
     if (!targetDrum) {
-      this.aimTargetText.textContent = 'Aim: Point at 3D drum';
+      this.aimTargetText.textContent = 'Hands: Over 3D Drum';
       if (this.aimTargetPill) this.aimTargetPill.classList.remove('active-target');
       return;
     }
