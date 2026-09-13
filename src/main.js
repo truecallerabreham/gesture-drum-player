@@ -26,7 +26,11 @@ class AeroDrumApp {
     console.log('[AeroDrumApp] Initializing 3D Stage & Audio Engine...');
 
     const canvas = document.getElementById('three-canvas');
-    this.drumScene = new DrumScene(canvas, window.THREE);
+    this.drumScene = new DrumScene(canvas, window.THREE, {
+      onPointerHit: (drumName, velocity, source) => {
+        this.handleDrumHit(drumName, velocity, source);
+      }
+    });
 
     this.hud = new HUDController({
       soundEngine: this.soundEngine,
@@ -56,18 +60,26 @@ class AeroDrumApp {
   }
 
   async startApp() {
+    console.log('[AeroDrumApp] Starting Audio Context...');
     try {
-      console.log('[AeroDrumApp] Starting Camera & Audio Context...');
       await this.soundEngine.init();
+    } catch (audioErr) {
+      console.warn('[AeroDrumApp] AudioContext init warning:', audioErr);
+    }
 
+    // Set running immediately so keyboard & 3D mouse click interactions work instantly
+    this.isRunning = true;
+
+    try {
+      console.log('[AeroDrumApp] Initializing Webcam & MediaPipe Hands...');
       const videoElement = await this.cameraManager.start();
       await this.handTracker.start(videoElement);
-
-      this.isRunning = true;
-      console.log('[AeroDrumApp] Air-drumming system is active and ready!');
+      console.log('[AeroDrumApp] Air-drumming system is active and tracking hands!');
     } catch (err) {
-      console.error('[AeroDrumApp] Startup error:', err);
-      alert(err.message || 'Error starting camera or audio.');
+      console.warn('[AeroDrumApp] Camera gesture tracking notice:', err);
+      if (this.hud && this.hud.statusText) {
+        this.hud.statusText.textContent = 'Camera disabled — Play with Mouse Clicks or Keys 1-5 & Space';
+      }
     }
   }
 

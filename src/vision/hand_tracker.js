@@ -35,17 +35,25 @@ export class HandTracker {
     }
 
     this.hands = new window.Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`
     });
 
     this.hands.setOptions({
       maxNumHands: 2,
       modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
     });
 
     this.hands.onResults((results) => this.handleResults(results));
+
+    try {
+      if (typeof this.hands.initialize === 'function') {
+        await this.hands.initialize();
+      }
+    } catch (initErr) {
+      console.warn('[HandTracker] Hands.initialize warning:', initErr);
+    }
   }
 
   /**
@@ -65,33 +73,37 @@ export class HandTracker {
 
     this.isTracking = true;
 
-    // Utilize MediaPipe Camera helper or requestVideoFrameCallback / requestAnimationFrame
-    if (typeof window.Camera !== 'undefined') {
-      this.camera = new window.Camera(this.videoElement, {
-        onFrame: async () => {
-          if (this.isTracking && this.videoElement.readyState >= 2) {
-            await this.hands.send({ image: this.videoElement });
-          }
-        },
-        width: 640,
-        height: 480
-      });
-      await this.camera.start();
+    // Use non-blocking, re-entrancy safe frame pump
+    // This avoids camera hardware collisions caused by window.Camera
+    let isProcessing = false;
+
+    const onFrame = async () => {
+      if (!this.isTracking) return;
+
+      if (this.videoElement && this.videoElement.readyState >= 2 && !isProcessing) {
+        isProcessing = true;
+        try {
+          await this.hands.send({ image: this.videoElement });
+        } catch (e) {
+          console.warn('[HandTracker] Frame send warning:', e);
+        } finally {
+          isProcessing = false;
+        }
+      }
+
+      if (this.isTracking && this.videoElement) {
+        if ('requestVideoFrameCallback' in this.videoElement) {
+          this.videoElement.requestVideoFrameCallback(onFrame);
+        } else {
+          requestAnimationFrame(onFrame);
+        }
+      }
+    };
+
+    if ('requestVideoFrameCallback' in this.videoElement) {
+      this.videoElement.requestVideoFrameCallback(onFrame);
     } else {
-      // Fallback loop using requestAnimationFrame
-      const processFrame = async () => {
-        if (this.isTracking && this.videoElement.readyState >= 2) {
-          try {
-            await this.hands.send({ image: this.videoElement });
-          } catch (e) {
-            console.warn('[HandTracker] Frame send warning:', e);
-          }
-        }
-        if (this.isTracking) {
-          requestAnimationFrame(processFrame);
-        }
-      };
-      requestAnimationFrame(processFrame);
+      requestAnimationFrame(onFrame);
     }
   }
 

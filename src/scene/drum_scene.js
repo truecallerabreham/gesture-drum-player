@@ -6,13 +6,14 @@ import { ParticleEffects } from './particles.js';
  * DrumScene - Main Three.js visual concert stage manager.
  */
 export class DrumScene {
-  constructor(canvasElement, THREE) {
+  constructor(canvasElement, THREE, options = {}) {
     this.canvas = canvasElement;
     this.THREE = THREE || window.THREE;
     if (!this.THREE) {
       throw new Error('Three.js is not loaded.');
     }
 
+    this.onPointerHit = options.onPointerHit || null;
     this.scene = null;
     this.camera = null;
     this.renderer = null;
@@ -25,6 +26,7 @@ export class DrumScene {
     this.initLights();
     this.initStage();
     this.initComponents();
+    this.initPointerEvents();
     this.handleResize();
 
     window.addEventListener('resize', () => this.handleResize());
@@ -129,6 +131,43 @@ export class DrumScene {
     this.drumKit = new DrumKitModels(this.THREE, this.scene);
     this.avatarHands = new AvatarHands(this.THREE, this.scene);
     this.particles = new ParticleEffects(this.THREE, this.scene);
+  }
+
+  /**
+   * Initializes 3D mouse and touch raycaster interaction on drumhead meshes
+   */
+  initPointerEvents() {
+    if (!this.canvas) return;
+    const THREE = this.THREE;
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    const onPointerDown = (event) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const clientX = event.clientX !== undefined ? event.clientX : (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
+      const clientY = event.clientY !== undefined ? event.clientY : (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
+
+      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(pointer, this.camera);
+
+      if (this.drumKit && this.drumKit.drums) {
+        for (const [drumName, drum] of Object.entries(this.drumKit.drums)) {
+          if (!drum || !drum.group) continue;
+          const intersects = raycaster.intersectObjects(drum.group.children, true);
+          if (intersects.length > 0) {
+            const mappedName = drumName === 'kickpad' ? 'kick' : drumName;
+            if (this.onPointerHit) {
+              this.onPointerHit(mappedName, 0.95, 'pointer');
+            }
+            break;
+          }
+        }
+      }
+    };
+
+    this.canvas.addEventListener('pointerdown', onPointerDown);
   }
 
   handleResize() {

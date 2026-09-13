@@ -101,5 +101,23 @@ export function runTriggerTests(runner) {
       trigger.checkStrikes(mockHands, mockAvatarHands);
       assert.equal(hitCount, 0, 'No hit triggered without downward velocity');
     });
+
+    runner.test('triggerHit dispatches keyboard strikes for full kit', (assert) => {
+      const hits = [];
+      const trigger = new DrumTrigger({
+        onHit: (drum, vel, source) => {
+          hits.push({ drum, vel, source });
+        }
+      });
+
+      trigger.triggerHit('snare', 1.0, 'keyboard');
+      trigger.triggerHit('hihat', 1.0, 'keyboard');
+      trigger.triggerHit('kick', 1.0, 'keyboard');
+
+      assert.equal(hits.length, 3, 'Dispatched 3 hits');
+      assert.equal(hits[0].drum, 'snare', 'First hit was snare');
+      assert.equal(hits[1].drum, 'hihat', 'Second hit was hihat');
+      assert.equal(hits[2].drum, 'kick', 'Third hit was kick');
+    });
   });
 }

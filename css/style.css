@@ -48,14 +48,16 @@ html, body {
   display: block;
 }
 
-/* Hidden video element for computer vision */
+/* Active video element for computer vision (non-throttled by browser compositor) */
 #webcam-video {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 240px;
+  opacity: 0.001;
   pointer-events: none;
-  z-index: -1;
+  z-index: -9999;
 }
 
 /* ==========================================================================

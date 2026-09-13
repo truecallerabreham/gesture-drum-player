@@ -33,14 +33,41 @@ export class CameraManager {
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (this.videoElement) {
         this.videoElement.srcObject = this.stream;
+        this.videoElement.muted = true;
+        this.videoElement.playsInline = true;
+
         await new Promise((resolve) => {
-          this.videoElement.onloadedmetadata = () => {
-            this.videoElement.play();
-            this.width = this.videoElement.videoWidth;
-            this.height = this.videoElement.videoHeight;
+          let resolved = false;
+          const done = async () => {
+            if (resolved) return;
+            resolved = true;
+            try {
+              await this.videoElement.play();
+            } catch (playErr) {
+              console.warn('[CameraManager] videoElement.play() warning:', playErr);
+            }
+            this.width = this.videoElement.videoWidth || 640;
+            this.height = this.videoElement.videoHeight || 480;
             this.isStreaming = true;
             resolve();
           };
+
+          // Safety timeout in case browser does not trigger metadata events
+          const timeout = setTimeout(done, 3000);
+
+          if (this.videoElement.readyState >= 2) {
+            clearTimeout(timeout);
+            done();
+          } else {
+            this.videoElement.onloadeddata = () => {
+              clearTimeout(timeout);
+              done();
+            };
+            this.videoElement.onloadedmetadata = () => {
+              clearTimeout(timeout);
+              done();
+            };
+          }
         });
       }
       return this.videoElement;

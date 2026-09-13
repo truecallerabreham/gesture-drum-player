@@ -67,67 +67,67 @@ export class DrumKitModels {
   buildKit() {
     const THREE = this.THREE;
 
-    // 1. SNARE DRUM (Center-Left: x: -1.2, y: -0.2, z: -2.5)
+    // 1. SNARE DRUM (Center-Left: reachable at x: -0.9, y: -0.2, z: -2.1)
     this.drums.snare = this.createDrumMesh({
-      radius: 0.7,
-      height: 0.45,
-      pos: new THREE.Vector3(-1.2, -0.2, -2.6),
+      radius: 0.65,
+      height: 0.4,
+      pos: new THREE.Vector3(-0.9, -0.2, -2.1),
       rot: new THREE.Euler(0.1, 0.15, 0),
       name: 'snare',
       color: 0x00f0ff
     });
 
-    // 2. HI-HAT CYMBALS (Far-Left: x: -2.4, y: 0.3, z: -2.4)
+    // 2. HI-HAT CYMBALS (Left: reachable at x: -1.8, y: 0.25, z: -2.1)
     this.drums.hihat = this.createCymbalMesh({
-      radius: 0.65,
-      pos: new THREE.Vector3(-2.3, 0.35, -2.4),
+      radius: 0.6,
+      pos: new THREE.Vector3(-1.8, 0.25, -2.1),
       rot: new THREE.Euler(0.12, 0.2, 0),
       name: 'hihat',
       color: 0xffaa00
     });
 
-    // 3. HIGH TOM (Center-Upper Left: x: -0.8, y: 0.7, z: -3.3)
+    // 3. HIGH TOM (Center-Upper Left: reachable at x: -0.55, y: 0.35, z: -2.3)
     this.drums.tom1 = this.createDrumMesh({
-      radius: 0.6,
-      height: 0.55,
-      pos: new THREE.Vector3(-0.8, 0.7, -3.3),
-      rot: new THREE.Euler(0.35, 0.2, 0),
+      radius: 0.55,
+      height: 0.45,
+      pos: new THREE.Vector3(-0.55, 0.35, -2.3),
+      rot: new THREE.Euler(0.3, 0.15, 0),
       name: 'tom1',
       color: 0x3388ff
     });
 
-    // 4. FLOOR / LOW TOM (Center-Right: x: 1.3, y: -0.25, z: -2.6)
+    // 4. FLOOR / LOW TOM (Center-Right: reachable at x: 1.0, y: -0.2, z: -2.1)
     this.drums.tom2 = this.createDrumMesh({
-      radius: 0.75,
-      height: 0.65,
-      pos: new THREE.Vector3(1.3, -0.25, -2.6),
+      radius: 0.7,
+      height: 0.5,
+      pos: new THREE.Vector3(1.0, -0.2, -2.1),
       rot: new THREE.Euler(0.1, -0.15, 0),
       name: 'tom2',
       color: 0xaa00ff
     });
 
-    // 5. CRASH CYMBAL (Upper-Right: x: 2.3, y: 0.8, z: -2.8)
+    // 5. CRASH CYMBAL (Right: reachable at x: 1.7, y: 0.5, z: -2.2)
     this.drums.crash = this.createCymbalMesh({
-      radius: 0.9,
-      pos: new THREE.Vector3(2.3, 0.8, -2.8),
-      rot: new THREE.Euler(0.3, -0.3, 0),
+      radius: 0.8,
+      pos: new THREE.Vector3(1.7, 0.5, -2.2),
+      rot: new THREE.Euler(0.25, -0.25, 0),
       name: 'crash',
       color: 0xff0055
     });
 
-    // 6. BASS / KICK DRUM (Center Floor: x: 0, y: -0.8, z: -3.8)
+    // 6. BASS / KICK DRUM (Center Floor visual)
     this.drums.kick = this.createKickDrumMesh({
-      radius: 1.1,
-      depth: 1.0,
-      pos: new THREE.Vector3(0, -0.8, -3.8),
+      radius: 1.0,
+      depth: 0.9,
+      pos: new THREE.Vector3(0, -0.75, -2.7),
       name: 'kick',
       color: 0x00f0ff
     });
 
-    // 7. CENTER VIRTUAL KICK HAND-PAD (Floating reachable center pad: x: 0, y: -0.6, z: -2.2)
+    // 7. CENTER VIRTUAL KICK HAND-PAD (Reachable floating pad: x: 0, y: -0.55, z: -2.0)
     this.drums.kickpad = this.createVirtualPadMesh({
       radius: 0.55,
-      pos: new THREE.Vector3(0, -0.65, -2.2),
+      pos: new THREE.Vector3(0, -0.55, -2.0),
       name: 'kickpad',
       color: 0x00f0ff
     });
@@ -168,15 +168,15 @@ export class DrumKitModels {
 
     this.scene.add(group);
 
-    // Track strike zone bounding cylinder
+    // Track strike zone bounding cylinder (generous bounds prevent tunneling)
     return {
       group,
       head,
       basePos: pos.clone(),
       baseRot: rot ? rot.clone() : new THREE.Euler(),
       center: pos.clone().add(new THREE.Vector3(0, height * 0.5, 0)),
-      radius: radius * 1.15,
-      height: 0.45,
+      radius: radius * 1.35,
+      height: 0.75,
       name,
       color,
       isCymbal: false
@@ -215,8 +215,8 @@ export class DrumKitModels {
       basePos: pos.clone(),
       baseRot: rot.clone(),
       center: pos.clone(),
-      radius: radius * 1.1,
-      height: 0.4,
+      radius: radius * 1.35,
+      height: 0.75,
       name,
       color,
       isCymbal: true
@@ -284,8 +284,8 @@ export class DrumKitModels {
       group,
       basePos: pos.clone(),
       center: pos.clone(),
-      radius,
-      height: 0.35,
+      radius: radius * 1.35,
+      height: 0.65,
       name,
       color,
       isCymbal: false

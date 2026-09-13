@@ -24,10 +24,27 @@ export class DrumTrigger {
   }
 
   bindKeyboard() {
+    const keyMap = {
+      'Digit1': 'snare',
+      'KeyS': 'snare',
+      'Digit2': 'hihat',
+      'KeyH': 'hihat',
+      'Digit3': 'tom1',
+      'KeyT': 'tom1',
+      'Digit4': 'tom2',
+      'KeyF': 'tom2',
+      'Digit5': 'crash',
+      'KeyC': 'crash',
+      'Space': 'kick',
+      'KeyB': 'kick'
+    };
+
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !e.repeat) {
-        e.preventDefault();
-        this.triggerHit('kick', 1.0, 'keyboard');
+      if (keyMap[e.code] && !e.repeat) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+        }
+        this.triggerHit(keyMap[e.code], 1.0, 'keyboard');
       }
     });
   }
