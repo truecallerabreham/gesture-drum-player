@@ -40,9 +40,9 @@ export class HandTracker {
 
     this.hands.setOptions({
       maxNumHands: 2,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
+      modelComplexity: 0, // Lite model for rock-solid 60+ FPS without frame drops
+      minDetectionConfidence: 0.3, // Lower threshold prevents losing hands during fast motion blur
+      minTrackingConfidence: 0.3
     });
 
     this.hands.onResults((results) => this.handleResults(results));
@@ -72,9 +72,13 @@ export class HandTracker {
     }
 
     this.isTracking = true;
+    this.lastSeen = { left: 0, right: 0 };
+    this.lastVelocities = {
+      left: { vx: 0, vy: 0, vz: 0, speed: 0 },
+      right: { vx: 0, vy: 0, vz: 0, speed: 0 }
+    };
 
     // Use non-blocking, re-entrancy safe frame pump
-    // This avoids camera hardware collisions caused by window.Camera
     let isProcessing = false;
 
     const onFrame = async () => {
@@ -112,7 +116,7 @@ export class HandTracker {
    */
   handleResults(results) {
     const now = performance.now();
-    const dt = this.previousHands.timestamp > 0 ? (now - this.previousHands.timestamp) / 1000 : 0.016;
+    const dt = this.previousHands.timestamp > 0 ? Math.min(0.05, (now - this.previousHands.timestamp) / 1000) : 0.016;
 
     const detectedHands = {
       left: null,
@@ -120,80 +124,100 @@ export class HandTracker {
       count: 0
     };
 
+    const seenSides = { left: false, right: false };
+
     if (results.multiHandLandmarks && results.multiHandedness) {
       for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-        const landmarks = results.multiHandLandmarks[i];
+        const rawLandmarks = results.multiHandLandmarks[i];
         const handedness = results.multiHandedness[i].label.toLowerCase(); // 'left' or 'right'
         
-        // MediaPipe reports from perspective of camera:
-        // When mirrored, camera 'left' appears on the user's right side, so we flip or preserve based on mirror intent:
+        // When mirrored, camera 'left' appears on the user's right side
         const side = handedness === 'left' ? 'right' : 'left';
+        seenSides[side] = true;
 
-        // Extract key strike points: Index fingertip (8), Middle fingertip (12), Wrist (0)
-        const indexTip = landmarks[8];
-        const middleTip = landmarks[12];
-        const wrist = landmarks[0];
+        // Mirror all 21 landmarks along X axis so 3D hand tracks accurately
+        const mirroredLandmarks = rawLandmarks.map(pt => ({
+          x: 1.0 - pt.x,
+          y: pt.y,
+          z: pt.z || 0
+        }));
 
-        // Mirror X coordinate so moving physical hand right moves on-screen right
-        const rawPoint = {
-          x: (1.0 - indexTip.x),
-          y: indexTip.y,
-          z: indexTip.z || 0
+        const wrist = mirroredLandmarks[0];
+        const indexMcp = mirroredLandmarks[5];
+        const pinkyMcp = mirroredLandmarks[17];
+        const indexTip = mirroredLandmarks[8];
+        const middleTip = mirroredLandmarks[12];
+
+        // 1. Stable Palm Center (centroid of wrist and outer knuckles)
+        const palmCenter = {
+          x: (wrist.x + indexMcp.x + pinkyMcp.x) / 3,
+          y: (wrist.y + indexMcp.y + pinkyMcp.y) / 3,
+          z: (wrist.z + indexMcp.z + pinkyMcp.z) / 3
         };
 
-        const rawWrist = {
-          x: (1.0 - wrist.x),
-          y: wrist.y,
-          z: wrist.z || 0
+        // 2. Hand Strike Center: combines palm mass and finger reach
+        const strikePointRaw = {
+          x: palmCenter.x * 0.5 + (indexTip.x + middleTip.x) * 0.25,
+          y: palmCenter.y * 0.5 + (indexTip.y + middleTip.y) * 0.25,
+          z: palmCenter.z * 0.5 + (indexTip.z + middleTip.z) * 0.25
         };
 
-        const indexMcp = landmarks[5];
-        const rawMcp = {
-          x: (1.0 - indexMcp.x),
-          y: indexMcp.y,
-          z: indexMcp.z || 0
-        };
-
-        // Vector pointing along the finger/pen axis
-        const dirX = rawPoint.x - rawMcp.x;
-        const dirY = rawPoint.y - rawMcp.y;
-        const dirZ = rawPoint.z - rawMcp.z;
-        const dirLen = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) || 1;
-
-        const aimDirection = {
-          x: dirX / dirLen,
-          y: dirY / dirLen,
-          z: dirZ / dirLen
-        };
-
-        // Smooth point
+        // Smooth position for jitter-free tracking
         const prevSmoothed = this.smoothedHands[side];
-        const smoothed = MathUtils.smoothPoint(rawPoint, prevSmoothed, 0.75);
+        const smoothed = MathUtils.smoothPoint(strikePointRaw, prevSmoothed, 0.72);
         this.smoothedHands[side] = smoothed;
 
-        // Calculate velocity (y is down in screen coordinates: 0 is top, 1 is bottom)
-        // A downward strike produces positive dy in screen space (y increases downward)
+        // Calculate velocity (y increases downward in screen space: positive vy = downward motion)
         const prevPoint = this.previousHands[side] ? this.previousHands[side].position : null;
         const velocity = MathUtils.calculateVelocity(smoothed, prevPoint, dt);
+
+        this.lastSeen[side] = now;
+        this.lastVelocities[side] = velocity;
 
         detectedHands[side] = {
           side,
           position: smoothed,
-          wrist: rawWrist,
-          mcp: rawMcp,
-          aimDirection,
+          palmCenter,
+          wrist,
           velocity,
-          landmarks,
-          confidence: results.multiHandedness[i].score
+          landmarks: mirroredLandmarks,
+          confidence: results.multiHandedness[i].score,
+          isExtrapolated: false
         };
         detectedHands.count++;
       }
     }
 
+    // Dead-reckoning grace period (120ms): prevent tracking dropouts during rapid motion blur
+    ['left', 'right'].forEach(side => {
+      if (!seenSides[side] && (now - this.lastSeen[side]) < 120 && this.smoothedHands[side]) {
+        const prevPos = this.smoothedHands[side];
+        const lastV = this.lastVelocities[side] || { vx: 0, vy: 0, vz: 0, speed: 0 };
+        const extrapolated = {
+          x: Math.max(0, Math.min(1, prevPos.x + lastV.vx * 0.2 * dt)),
+          y: Math.max(0, Math.min(1, prevPos.y + lastV.vy * 0.2 * dt)),
+          z: (prevPos.z || 0) + (lastV.vz || 0) * 0.2 * dt
+        };
+        this.smoothedHands[side] = extrapolated;
+
+        detectedHands[side] = {
+          side,
+          position: extrapolated,
+          palmCenter: extrapolated,
+          wrist: extrapolated,
+          velocity: lastV,
+          landmarks: this.previousHands[side] ? this.previousHands[side].landmarks : null,
+          confidence: 0.4,
+          isExtrapolated: true
+        };
+        detectedHands.count++;
+      }
+    });
+
     // Update tracking history
     this.previousHands = {
-      left: detectedHands.left ? { position: detectedHands.left.position } : null,
-      right: detectedHands.right ? { position: detectedHands.right.position } : null,
+      left: detectedHands.left ? { position: detectedHands.left.position, landmarks: detectedHands.left.landmarks, wrist: detectedHands.left.wrist } : null,
+      right: detectedHands.right ? { position: detectedHands.right.position, landmarks: detectedHands.right.landmarks, wrist: detectedHands.right.wrist } : null,
       timestamp: now
     };
 
