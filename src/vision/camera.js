@@ -22,8 +22,8 @@ export class CameraManager {
     const constraints = {
       audio: false,
       video: {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
         facingMode: 'user',
         frameRate: { ideal: 60, min: 30 }
       }
