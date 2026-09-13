@@ -125,5 +125,38 @@ export function runVisionTests(runner) {
       const rightHand = tracker.updateHandState('right', 0.85, 0.50, 0.55, [0.75, 0.40, 0.95, 0.60], 0.016, 132);
       assert.isTrue(rightHand.position.x > 0.60, 'Single hand glides seamlessly across to right rim');
     });
+
+    runner.test('NativeCVTracker initializes 2D macrocell grid and suppresses stationary upper face', (assert) => {
+      const tracker = new NativeCVTracker();
+      assert.equal(tracker.cols, 40, 'Grid has 40 columns');
+      assert.equal(tracker.rows, 30, 'Grid has 30 rows');
+      assert.equal(tracker.numCells, 1200, 'Total macrocells = 1200');
+
+      // Simulate face presence: upper-center cell (cy = 5, cx = 20) with skin and low motion
+      const faceIdx = 5 * 40 + 20;
+      tracker.cellSkin[faceIdx] = 10;
+      tracker.cellMotion[faceIdx] = 5;
+
+      // Simulate building face confidence
+      for (let f = 0; f < 8; f++) {
+        tracker.faceConfidence[faceIdx] = Math.min(1.0, tracker.faceConfidence[faceIdx] + 0.08);
+      }
+
+      assert.isTrue(tracker.faceConfidence[faceIdx] > 0.45, 'Stationary upper-center skin marked as face');
+
+      // An active hand cell in lower zone (cy = 18, cx = 15) should NOT be marked as face
+      const handIdx = 18 * 40 + 15;
+      assert.equal(tracker.faceConfidence[handIdx], 0, 'Hand zone cell has 0 face confidence');
+    });
+
+    runner.test('NativeCVTracker tracks palm centroid and strike tip independently', (assert) => {
+      const tracker = new NativeCVTracker();
+
+      const hand = tracker.updateHandState('right', 0.50, 0.60, 0.48, [0.40, 0.45, 0.60, 0.75], 0.016, 100);
+      assert.isNotNull(hand.palmCenter, 'Palm center exists');
+      assert.isNotNull(hand.strikeTip, 'Strike tip exists');
+      assert.equal(hand.palmCenter.y, hand.position.y, 'Position matches palm center');
+      assert.isTrue(hand.strikeTip.y <= hand.palmCenter.y, 'Strike tip (fingertip) points forward/upward');
+    });
   });
 }

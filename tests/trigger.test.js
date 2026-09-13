@@ -238,5 +238,49 @@ export function runTriggerTests(runner) {
       assert.equal(hits[0].source, 'left', 'Left hand struck');
       assert.equal(hits[1].source, 'right', 'Right hand struck');
     });
+
+    runner.test('Inflection rebound triggers hit when stroke decelerates at bottom of strike', (assert) => {
+      let hit = null;
+      const trigger = new DrumTrigger({
+        drums: { snare: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.0, height: 0.8 } },
+        onHit: (drum, vel, source) => { hit = { drum, vel, source }; }
+      });
+
+      // Frame 1: Rapid downward stroke (prevVy = 0.35)
+      const frame1Hands = { right: { velocity: { vy: 0.35, speed: 0.35 } } };
+      const frame1Avatar = { getTipPosition: () => ({ x: 0, y: 0, z: -2.0 }) };
+      trigger.checkStrikes(frame1Hands, frame1Avatar);
+      assert.isNotNull(hit, 'First downward stroke fires');
+
+      hit = null;
+      // Advance clock past cooldown
+      trigger.handStates.right.lastHitTime = performance.now() - 100;
+      trigger.handStates.right.prevVy = 0.28; // was moving fast down
+
+      // Frame 2: Hand stops/rebounds at bottom of stroke (vy = 0.02)
+      const frame2Hands = { right: { velocity: { vy: 0.02, speed: 0.05 } } };
+      trigger.checkStrikes(frame2Hands, frame1Avatar);
+      assert.isNotNull(hit, 'Bottom-of-stroke deceleration inflection triggers hit');
+    });
+
+    runner.test('Resting hands at bottom of camera do not trigger accidental hits', (assert) => {
+      let hit = null;
+      const trigger = new DrumTrigger({
+        drums: { snare: { center: { x: 0, y: 0, z: -2.0 }, radius: 1.0, height: 0.8 } },
+        onHit: (drum, vel, source) => { hit = { drum, vel, source }; }
+      });
+
+      // Hand resting at bottom edge of screen (y = 0.94, slow downward velocity vy = 0.19)
+      const restingHands = {
+        right: {
+          position: { x: 0.5, y: 0.94, z: 0 },
+          velocity: { vy: 0.19, speed: 0.20 }
+        }
+      };
+      const avatar = { getTipPosition: () => ({ x: 0, y: -0.6, z: -2.0 }) };
+
+      trigger.checkStrikes(restingHands, avatar);
+      assert.isNull(hit, 'Resting hand at bottom edge is suppressed and does not fire hit');
+    });
   });
 }
