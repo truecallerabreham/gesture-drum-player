@@ -29,6 +29,11 @@ class AeroDrumApp {
     this.drumScene = new DrumScene(canvas, window.THREE, {
       onPointerHit: (drumName, velocity, source) => {
         this.handleDrumHit(drumName, velocity, source);
+      },
+      onTargetChange: (targetDrum) => {
+        if (this.hud) {
+          this.hud.updateTargetDisplay(targetDrum);
+        }
       }
     });
 
@@ -101,14 +106,15 @@ class AeroDrumApp {
     const dt = Math.min(0.1, (now - this.lastTime) / 1000);
     this.lastTime = now;
 
-    // Check gesture strikes
-    if (this.isRunning && this.drumTrigger && this.drumScene && this.drumScene.avatarHands) {
-      this.drumTrigger.checkStrikes(this.latestHands, this.drumScene.avatarHands);
-    }
-
-    // Render 3D scene & update effects
+    // 1. Render 3D scene & update effects (computes target ray intersections)
     if (this.drumScene) {
       this.drumScene.update(this.latestHands, dt);
+    }
+
+    // 2. Check gesture strikes with pen aiming target support
+    if (this.isRunning && this.drumTrigger && this.drumScene && this.drumScene.avatarHands) {
+      const targetedDrums = this.drumScene.getTargetedDrums ? this.drumScene.getTargetedDrums() : {};
+      this.drumTrigger.checkStrikes(this.latestHands, this.drumScene.avatarHands, targetedDrums);
     }
   }
 }

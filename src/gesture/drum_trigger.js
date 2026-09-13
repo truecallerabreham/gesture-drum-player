@@ -50,11 +50,12 @@ export class DrumTrigger {
   }
 
   /**
-   * Checks for drum strikes based on current avatar stick tip positions and velocities
+   * Checks for drum strikes based on current pen tip positions, aim targets, and velocities
    * @param {Object} detectedHands - { left, right }
    * @param {AvatarHands} avatarHands - Avatar drumsticks instance with 3D tip positions
+   * @param {Object} targetedDrums - { left: drumName, right: drumName }
    */
-  checkStrikes(detectedHands, avatarHands) {
+  checkStrikes(detectedHands, avatarHands, targetedDrums = {}) {
     const now = performance.now();
 
     ['left', 'right'].forEach(side => {
@@ -65,8 +66,31 @@ export class DrumTrigger {
       if (!tipPos) return;
 
       // In screen coordinates, y increases downward, so downward movement has positive vy
-      const vy = hand.velocity ? hand.velocity.vy * 4.0 : 0; // scaled downward velocity
+      const vy = hand.velocity ? hand.velocity.vy * 4.0 : 0;
+      const vz = hand.velocity ? hand.velocity.vz * 4.0 : 0;
+      const isDownwardStroke = vy > this.minDownwardVelocity;
+      const isForwardPlunge = vz < -this.minDownwardVelocity * 0.75;
+      const isStrikeGesture = isDownwardStroke || isForwardPlunge;
 
+      // 1. AIM-AND-STRIKE: If the pen laser ray is aiming at a drum
+      const targetedDrum = targetedDrums ? targetedDrums[side] : null;
+      if (targetedDrum && isStrikeGesture) {
+        if (!this.padStates[targetedDrum]) {
+          this.padStates[targetedDrum] = { lastHitTime: -10000, wasInside: { left: false, right: false } };
+        }
+        const state = this.padStates[targetedDrum];
+        const cooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
+
+        if (cooldownOk) {
+          const strokeSpeed = Math.max(vy, -vz);
+          const hitVelocity = MathUtils.mapRange(strokeSpeed, this.minDownwardVelocity, 5.0, 0.45, 1.0, true);
+          state.lastHitTime = now;
+          this.triggerHit(targetedDrum, hitVelocity, `${side}-pen`, tipPos);
+          return;
+        }
+      }
+
+      // 2. PROXIMITY CYLINDER FALLBACK: When physically tapping inside drum volume
       for (const [drumName, drum] of Object.entries(this.drums)) {
         if (!drum || !drum.center) continue;
 
@@ -78,7 +102,6 @@ export class DrumTrigger {
         }
         const state = this.padStates[drumName];
 
-        // 1. Check if tip is inside the drum pad's 3D cylinder
         const isInside = MathUtils.pointInCylinder(
           tipPos,
           drum.center,
@@ -86,17 +109,11 @@ export class DrumTrigger {
           drum.height
         );
 
-        // 2. Cooldown check
         const cooldownOk = (now - state.lastHitTime) > this.refractoryPeriod;
-
-        // 3. Strike detection: Entering cylinder with downward velocity
         const wasInside = state.wasInside[side];
-        const isDownwardStroke = vy > this.minDownwardVelocity;
 
         if (isInside && !wasInside && isDownwardStroke && cooldownOk) {
-          // Normalize velocity to 0.3 - 1.0 range
           const hitVelocity = MathUtils.mapRange(vy, this.minDownwardVelocity, 5.0, 0.4, 1.0, true);
-
           state.lastHitTime = now;
           const mappedName = drumName === 'kickpad' ? 'kick' : drumName;
           this.triggerHit(mappedName, hitVelocity, side, tipPos);

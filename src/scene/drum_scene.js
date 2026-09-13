@@ -1,6 +1,7 @@
 import { DrumKitModels } from './drum_models.js';
 import { AvatarHands } from './avatar_hands.js';
 import { ParticleEffects } from './particles.js';
+import { MathUtils } from '../gesture/math_utils.js';
 
 /**
  * DrumScene - Main Three.js visual concert stage manager.
@@ -14,6 +15,9 @@ export class DrumScene {
     }
 
     this.onPointerHit = options.onPointerHit || null;
+    this.onTargetChange = options.onTargetChange || null;
+    this.targetedDrums = { left: null, right: null };
+
     this.scene = null;
     this.camera = null;
     this.renderer = null;
@@ -21,11 +25,13 @@ export class DrumScene {
     this.drumKit = null;
     this.avatarHands = null;
     this.particles = null;
+    this.targetReticles = null;
 
     this.initScene();
     this.initLights();
     this.initStage();
     this.initComponents();
+    this.initTargetReticles();
     this.initPointerEvents();
     this.handleResize();
 
@@ -170,6 +176,63 @@ export class DrumScene {
     this.canvas.addEventListener('pointerdown', onPointerDown);
   }
 
+  initTargetReticles() {
+    this.targetReticles = {
+      left: this.createReticleMesh(0x00f0ff),
+      right: this.createReticleMesh(0xff0077)
+    };
+  }
+
+  createReticleMesh(color) {
+    const THREE = this.THREE;
+    const group = new THREE.Group();
+
+    // Outer aiming ring
+    const ringGeo = new THREE.TorusGeometry(0.34, 0.018, 16, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.88
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    group.add(ring);
+
+    // Crosshair ticks
+    const tickGeo = new THREE.PlaneGeometry(0.12, 0.016);
+    const tTop = new THREE.Mesh(tickGeo, ringMat);
+    tTop.position.y = 0.34;
+    group.add(tTop);
+
+    const tBottom = new THREE.Mesh(tickGeo, ringMat);
+    tBottom.position.y = -0.34;
+    group.add(tBottom);
+
+    const tLeft = new THREE.Mesh(tickGeo, ringMat);
+    tLeft.position.x = -0.34;
+    tLeft.rotation.z = Math.PI / 2;
+    group.add(tLeft);
+
+    const tRight = new THREE.Mesh(tickGeo, ringMat);
+    tRight.position.x = 0.34;
+    tRight.rotation.z = Math.PI / 2;
+    group.add(tRight);
+
+    // Center targeting pip
+    const pipGeo = new THREE.CircleGeometry(0.04, 16);
+    const pip = new THREE.Mesh(pipGeo, ringMat);
+    group.add(pip);
+
+    group.rotation.x = -Math.PI / 2;
+    group.visible = false;
+    this.scene.add(group);
+
+    return { group, ringMat, baseColor: color };
+  }
+
+  getTargetedDrums() {
+    return this.targetedDrums;
+  }
+
   handleResize() {
     if (!this.camera || !this.renderer) return;
     const width = window.innerWidth;
@@ -203,10 +266,81 @@ export class DrumScene {
    */
   update(detectedHands, dt) {
     const now = performance.now();
+    const THREE = this.THREE;
 
-    // 1. Update 3D avatar hands tracking
+    // 1. Update 3D avatar hands tracking and raycasting
     if (this.avatarHands && detectedHands) {
       this.avatarHands.update(detectedHands, this.camera);
+
+      ['left', 'right'].forEach(side => {
+        const aimRay = this.avatarHands.getAimRay(side);
+        const reticle = this.targetReticles ? this.targetReticles[side] : null;
+
+        if (!aimRay || !reticle || !detectedHands[side]) {
+          if (reticle) reticle.group.visible = false;
+          this.avatarHands.setLaserTarget(side, null);
+          this.targetedDrums[side] = null;
+          return;
+        }
+
+        let bestHit = null;
+        let bestDrumName = null;
+        let bestDist = Infinity;
+
+        if (this.drumKit && this.drumKit.drums) {
+          for (const [drumName, drum] of Object.entries(this.drumKit.drums)) {
+            if (!drum || !drum.center) continue;
+
+            // Disc surface intersection
+            const discHit = MathUtils.rayIntersectsDisc(
+              aimRay.origin,
+              aimRay.direction,
+              drum.center,
+              drum.radius * 1.35,
+              { x: 0, y: 1, z: 0 }
+            );
+
+            if (discHit && discHit.distance < bestDist) {
+              bestDist = discHit.distance;
+              bestHit = discHit.hitPoint;
+              bestDrumName = drumName === 'kickpad' ? 'kick' : drumName;
+            } else if (!bestHit) {
+              // Proximity angle fallback
+              const rayDist = MathUtils.rayDistanceToPoint(aimRay.origin, aimRay.direction, drum.center);
+              if (rayDist < drum.radius * 1.25) {
+                bestHit = drum.center;
+                bestDrumName = drumName === 'kickpad' ? 'kick' : drumName;
+              }
+            }
+          }
+        }
+
+        if (bestHit && bestDrumName) {
+          reticle.group.position.set(bestHit.x, bestHit.y + 0.02, bestHit.z);
+          reticle.group.visible = true;
+
+          // Pulse animation
+          const pulse = 1.0 + 0.08 * Math.sin(now * 0.01);
+          reticle.group.scale.set(pulse, pulse, pulse);
+
+          const drum = this.drumKit.drums[bestDrumName] || this.drumKit.drums.kickpad;
+          if (drum && drum.color) {
+            reticle.ringMat.color.setHex(drum.color);
+          }
+
+          this.avatarHands.setLaserTarget(side, new THREE.Vector3(bestHit.x, bestHit.y, bestHit.z));
+          this.targetedDrums[side] = bestDrumName;
+        } else {
+          reticle.group.visible = false;
+          this.avatarHands.setLaserTarget(side, null);
+          this.targetedDrums[side] = null;
+        }
+      });
+
+      if (this.onTargetChange) {
+        const activeTarget = this.targetedDrums.right || this.targetedDrums.left || null;
+        this.onTargetChange(activeTarget);
+      }
     }
 
     // 2. Update drum kit recoil animations

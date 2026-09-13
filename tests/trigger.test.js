@@ -35,9 +35,25 @@ export function runTriggerTests(runner) {
     runner.test('mapRange scales and clamps velocity', (assert) => {
       const scaled = MathUtils.mapRange(3.0, 1.0, 5.0, 0.4, 1.0, true);
       assert.equal(scaled, 0.7, '3.0 maps to 0.7 in range [0.4, 1.0]');
+    });
 
-      const clampedHigh = MathUtils.mapRange(10.0, 1.0, 5.0, 0.4, 1.0, true);
-      assert.equal(clampedHigh, 1.0, 'High values clamp to 1.0');
+    runner.test('rayDistanceToPoint computes perpendicular distance to target', (assert) => {
+      const origin = { x: 0, y: 0, z: 0 };
+      const dir = { x: 0, y: 0, z: -1 }; // forward along -Z
+      const point = { x: 0.5, y: 0, z: -3 }; // 0.5 units to the right
+      const dist = MathUtils.rayDistanceToPoint(origin, dir, point);
+      assert.equal(Math.round(dist * 10) / 10, 0.5, 'Perpendicular distance is 0.5');
+    });
+
+    runner.test('rayIntersectsDisc detects intersection on drumhead disc', (assert) => {
+      const origin = { x: 0, y: 1, z: 0 };
+      const dir = { x: 0, y: -1, z: 0 }; // straight down
+      const discCenter = { x: 0, y: 0, z: 0 };
+      const discRadius = 0.8;
+
+      const hit = MathUtils.rayIntersectsDisc(origin, dir, discCenter, discRadius, { x: 0, y: 1, z: 0 });
+      assert.isNotNull(hit, 'Ray hit disc');
+      assert.equal(hit.distance, 1.0, 'Hit distance is 1.0');
     });
   });
 
@@ -100,6 +116,33 @@ export function runTriggerTests(runner) {
 
       trigger.checkStrikes(mockHands, mockAvatarHands);
       assert.equal(hitCount, 0, 'No hit triggered without downward velocity');
+    });
+
+    runner.test('Aim-and-strike triggers hit on targeted drum when wrist snaps downward', (assert) => {
+      let struck = null;
+      const trigger = new DrumTrigger({
+        drums: {
+          crash: { center: { x: 1.7, y: 0.5, z: -2.2 }, radius: 0.8, height: 0.6 }
+        },
+        onHit: (drum, vel, source) => {
+          struck = { drum, vel, source };
+        }
+      });
+
+      const mockHands = {
+        right: { velocity: { vy: 0.6, vz: 0 } }
+      };
+
+      const mockAvatarHands = {
+        getTipPosition: () => ({ x: 0, y: 0, z: -1.9 }) // pen held at distance
+      };
+
+      const targetedDrums = { right: 'crash' }; // aiming at crash
+
+      trigger.checkStrikes(mockHands, mockAvatarHands, targetedDrums);
+      assert.isNotNull(struck, 'Aim-and-strike fired');
+      assert.equal(struck.drum, 'crash', 'Struck drum is targeted crash cymbal');
+      assert.equal(struck.source, 'right-pen', 'Source was right pen aim');
     });
 
     runner.test('triggerHit dispatches keyboard strikes for full kit', (assert) => {

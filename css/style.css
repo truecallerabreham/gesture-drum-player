@@ -144,6 +144,19 @@ header.hud-header {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
+.aim-target-pill {
+  border-color: rgba(255, 170, 0, 0.4);
+  color: var(--text-secondary);
+  transition: all 0.25s ease;
+}
+
+.aim-target-pill.active-target {
+  border-color: var(--primary-neon);
+  color: #ffffff;
+  background: rgba(0, 240, 255, 0.15);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.35);
+}
+
 .status-dot {
   width: 10px;
   height: 10px;

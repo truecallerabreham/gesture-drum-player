@@ -17,6 +17,8 @@ export class HUDController {
     this.btnStart = document.getElementById('btn-start');
     this.btnToggleCam = document.getElementById('btn-toggle-cam');
     this.cameraPreview = document.getElementById('camera-preview-container');
+    this.aimTargetPill = document.getElementById('aim-target-pill');
+    this.aimTargetText = document.getElementById('aim-target-text');
 
     this.bindEvents();
   }
@@ -73,6 +75,31 @@ export class HUDController {
         this.calibrationBanner.classList.add('hidden');
       }
     }
+  }
+
+  /**
+   * Updates live targeted drum label
+   */
+  updateTargetDisplay(targetDrum) {
+    if (!this.aimTargetText) return;
+    if (!targetDrum) {
+      this.aimTargetText.textContent = 'Aim: Point at drum';
+      if (this.aimTargetPill) this.aimTargetPill.classList.remove('active-target');
+      return;
+    }
+
+    const labels = {
+      snare: 'Snare',
+      hihat: 'Hi-Hat',
+      tom1: 'High Tom',
+      tom2: 'Floor Tom',
+      crash: 'Crash',
+      kick: 'Kick'
+    };
+
+    const name = labels[targetDrum] || targetDrum.toUpperCase();
+    this.aimTargetText.textContent = `🎯 Aiming: ${name}`;
+    if (this.aimTargetPill) this.aimTargetPill.classList.add('active-target');
   }
 
   /**

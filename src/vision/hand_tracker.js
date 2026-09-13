@@ -147,6 +147,25 @@ export class HandTracker {
           z: wrist.z || 0
         };
 
+        const indexMcp = landmarks[5];
+        const rawMcp = {
+          x: (1.0 - indexMcp.x),
+          y: indexMcp.y,
+          z: indexMcp.z || 0
+        };
+
+        // Vector pointing along the finger/pen axis
+        const dirX = rawPoint.x - rawMcp.x;
+        const dirY = rawPoint.y - rawMcp.y;
+        const dirZ = rawPoint.z - rawMcp.z;
+        const dirLen = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) || 1;
+
+        const aimDirection = {
+          x: dirX / dirLen,
+          y: dirY / dirLen,
+          z: dirZ / dirLen
+        };
+
         // Smooth point
         const prevSmoothed = this.smoothedHands[side];
         const smoothed = MathUtils.smoothPoint(rawPoint, prevSmoothed, 0.75);
@@ -161,6 +180,8 @@ export class HandTracker {
           side,
           position: smoothed,
           wrist: rawWrist,
+          mcp: rawMcp,
+          aimDirection,
           velocity,
           landmarks,
           confidence: results.multiHandedness[i].score

@@ -85,4 +85,55 @@ export class MathUtils {
     }
     return result;
   }
+
+  /**
+   * Calculates minimum perpendicular distance from a 3D forward ray to a point
+   * @param {Object} rayOrigin - {x, y, z}
+   * @param {Object} rayDir - {x, y, z} normalized
+   * @param {Object} targetPoint - {x, y, z}
+   * @returns {number} Distance in units
+   */
+  static rayDistanceToPoint(rayOrigin, rayDir, targetPoint) {
+    const vx = targetPoint.x - rayOrigin.x;
+    const vy = targetPoint.y - rayOrigin.y;
+    const vz = (targetPoint.z || 0) - (rayOrigin.z || 0);
+
+    const t = Math.max(0, vx * rayDir.x + vy * rayDir.y + vz * rayDir.z);
+    const closestX = rayOrigin.x + t * rayDir.x;
+    const closestY = rayOrigin.y + t * rayDir.y;
+    const closestZ = (rayOrigin.z || 0) + t * rayDir.z;
+
+    return MathUtils.distance3D(targetPoint, { x: closestX, y: closestY, z: closestZ });
+  }
+
+  /**
+   * Tests if a forward ray intersects a 3D circular disc/drumhead
+   */
+  static rayIntersectsDisc(rayOrigin, rayDir, discCenter, discRadius, planeNormal = { x: 0, y: 1, z: 0 }) {
+    const denom = rayDir.x * planeNormal.x + rayDir.y * planeNormal.y + rayDir.z * planeNormal.z;
+    if (Math.abs(denom) < 0.0001) {
+      return null; // Parallel to disc plane
+    }
+
+    const vx = discCenter.x - rayOrigin.x;
+    const vy = discCenter.y - rayOrigin.y;
+    const vz = discCenter.z - (rayOrigin.z || 0);
+    const t = (vx * planeNormal.x + vy * planeNormal.y + vz * planeNormal.z) / denom;
+
+    if (t < 0.1 || t > 15.0) {
+      return null; // Behind ray or too far
+    }
+
+    const hitPoint = {
+      x: rayOrigin.x + t * rayDir.x,
+      y: rayOrigin.y + t * rayDir.y,
+      z: (rayOrigin.z || 0) + t * rayDir.z
+    };
+
+    const distToCenter = MathUtils.distance3D(hitPoint, discCenter);
+    if (distToCenter <= discRadius) {
+      return { hitPoint, distance: t, distToCenter };
+    }
+    return null;
+  }
 }
