@@ -41,7 +41,7 @@ if (typeof globalThis.window === 'undefined') {
       createBiquadFilter() {
         return {
           type: 'highpass',
-          frequency: { setValueAtTime: () => {} },
+          frequency: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
           Q: { setValueAtTime: () => {} },
           connect: () => {}
         };
@@ -149,8 +149,11 @@ class TestRunner {
 
 import { runTriggerTests } from './trigger.test.js';
 import { runAudioTests } from './audio.test.js';
+import { runVisionTests } from './vision.test.js';
 
 const runner = new TestRunner();
 runTriggerTests(runner);
 runAudioTests(runner);
+runVisionTests(runner);
 runner.run();
+
