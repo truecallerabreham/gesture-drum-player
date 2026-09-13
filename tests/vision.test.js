@@ -103,5 +103,27 @@ export function runVisionTests(runner) {
       // Due to roll tilt, x-coordinates of fingertips differ from neutral
       assert.isTrue(rolledLandmarks[12].x !== neutralLandmarks[12].x, 'Middle fingertip X rotated by roll angle');
     });
+
+    runner.test('NativeCVTracker supports full-screen play anywhere across entire drumhead', (assert) => {
+      const tracker = new NativeCVTracker();
+
+      // Hand right in the dead center of the screen (x = 0.50)
+      const centerHand = tracker.updateHandState('right', 0.50, 0.50, 0.55, [0.40, 0.40, 0.60, 0.60], 0.016, 100, {
+        roll: 0,
+        openness: 1.0,
+        handScale: 1.0
+      });
+
+      assert.isNotNull(centerHand, 'Center hand tracked with 100% integrity');
+      assert.equal(centerHand.position.x, 0.50, 'Center hand coordinates preserved at x = 0.50');
+
+      // Hand moving all the way to the far left (x = 0.15)
+      const leftHand = tracker.updateHandState('right', 0.15, 0.50, 0.55, [0.05, 0.40, 0.25, 0.60], 0.016, 116);
+      assert.isTrue(leftHand.position.x < 0.40, 'Single hand glides seamlessly across from center to left rim');
+
+      // Hand moving all the way to the far right (x = 0.85)
+      const rightHand = tracker.updateHandState('right', 0.85, 0.50, 0.55, [0.75, 0.40, 0.95, 0.60], 0.016, 132);
+      assert.isTrue(rightHand.position.x > 0.60, 'Single hand glides seamlessly across to right rim');
+    });
   });
 }
