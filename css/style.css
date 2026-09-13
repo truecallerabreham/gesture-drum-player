@@ -231,6 +231,37 @@ header.hud-header {
   font-weight: 800;
 }
 
+.btn-beat-mode {
+  background: rgba(255, 170, 0, 0.12);
+  border-color: rgba(255, 170, 0, 0.4);
+}
+
+.btn-beat-mode.active-mode {
+  background: linear-gradient(135deg, rgba(255, 170, 0, 0.25), rgba(255, 0, 119, 0.25));
+  border-color: #ffaa00;
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.45);
+  color: #fff;
+}
+
+.btn-loop-toggle {
+  background: rgba(0, 255, 136, 0.12);
+  border-color: rgba(0, 255, 136, 0.4);
+}
+
+.btn-loop-toggle.loop-active {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.3), rgba(0, 240, 255, 0.3));
+  border-color: #00ff88;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+  color: #fff;
+  animation: pulse-loop 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-loop {
+  0% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(0, 255, 136, 0.7); }
+  100% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+}
+
 /* ==========================================================================
    Live Strike Visual Feedback Meter
    ========================================================================== */

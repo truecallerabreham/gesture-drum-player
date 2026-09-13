@@ -1,5 +1,6 @@
 /**
- * HUD Controller - Manages status badges, kit switcher UI, legend feedback, and calibration.
+ * HUD Controller - Manages status badges, Brazilian kit switcher UI,
+ * Song Beat Mode step sequencer indicators, and live strike feedback.
  */
 
 export class HUDController {
@@ -12,6 +13,9 @@ export class HUDController {
     this.statusText = document.getElementById('status-text');
     this.kitToggleBtn = document.getElementById('btn-kit-toggle');
     this.kitLabel = document.getElementById('kit-name-label');
+    this.beatModeBtn = document.getElementById('btn-beat-mode');
+    this.beatModeLabel = document.getElementById('beat-mode-label');
+    this.loopToggleBtn = document.getElementById('btn-loop-toggle');
     this.calibrationBanner = document.getElementById('calibration-banner');
     this.startOverlay = document.getElementById('start-overlay');
     this.btnStart = document.getElementById('btn-start');
@@ -21,6 +25,9 @@ export class HUDController {
     this.aimTargetText = document.getElementById('aim-target-text');
 
     this.bindEvents();
+    if (this.soundEngine) {
+      this.updateKitDisplay(this.soundEngine.currentKit);
+    }
   }
 
   bindEvents() {
@@ -42,16 +49,86 @@ export class HUDController {
       });
     }
 
+    if (this.beatModeBtn && this.soundEngine) {
+      this.beatModeBtn.addEventListener('click', () => {
+        const isSongBeat = this.soundEngine.toggleSongBeatMode();
+        this.updateBeatModeDisplay(isSongBeat);
+      });
+    }
+
+    if (this.loopToggleBtn && this.soundEngine) {
+      this.loopToggleBtn.addEventListener('click', () => {
+        const isLooping = this.soundEngine.toggleSongLoop();
+        this.updateLoopDisplay(isLooping);
+      });
+    }
+
     if (this.btnToggleCam && this.cameraPreview) {
       this.btnToggleCam.addEventListener('click', () => {
         this.cameraPreview.classList.toggle('visible');
       });
     }
+
+    // Keyboard shortcuts: M for Beat Mode, L for Loop, K for Kit
+    window.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.code === 'KeyM' && this.soundEngine) {
+        const isSongBeat = this.soundEngine.toggleSongBeatMode();
+        this.updateBeatModeDisplay(isSongBeat);
+      } else if (e.code === 'KeyL' && this.soundEngine) {
+        const isLooping = this.soundEngine.toggleSongLoop();
+        this.updateLoopDisplay(isLooping);
+      } else if (e.code === 'KeyK' && this.soundEngine) {
+        const newKit = this.soundEngine.toggleKit();
+        this.updateKitDisplay(newKit);
+      }
+    });
   }
 
   updateKitDisplay(kitName) {
     if (this.kitLabel) {
-      this.kitLabel.textContent = kitName === '808' ? 'Electronic 808' : 'Acoustic Rock';
+      const labels = {
+        magalenha: '🇧🇷 Magalenha (Batucada)',
+        funk: '🇧🇷 Baile Funk (Tamborzão)',
+        acoustic: '🥁 Acoustic Rock',
+        808: '⚡ Electronic 808'
+      };
+      this.kitLabel.textContent = labels[kitName] || kitName.toUpperCase();
+    }
+
+    // Update legend descriptions
+    const snareDesc = document.getElementById('legend-snare-text');
+    const rimDesc = document.getElementById('legend-rim-text');
+    const kickDesc = document.getElementById('legend-kick-text');
+
+    if (kitName === 'magalenha') {
+      if (snareDesc) snareDesc.textContent = '🎯 Center Sweetspot (Surdo Boom)';
+      if (rimDesc) rimDesc.textContent = '⚡ Chrome Rim (Repique Crack)';
+      if (kickDesc) kickDesc.textContent = '🦶 Surdo Sub Bass';
+    } else if (kitName === 'funk') {
+      if (snareDesc) snareDesc.textContent = '🎯 Center Sweetspot (Tamborzão Sub)';
+      if (rimDesc) rimDesc.textContent = '⚡ Chrome Rim (Baile Snare Crack)';
+      if (kickDesc) kickDesc.textContent = '🦶 Tamborzão Kick';
+    } else {
+      if (snareDesc) snareDesc.textContent = '🎯 Center Sweetspot (Snare)';
+      if (rimDesc) rimDesc.textContent = '⚡ Chrome Rimshot';
+      if (kickDesc) kickDesc.textContent = '🦶 Kick Bass';
+    }
+  }
+
+  updateBeatModeDisplay(isSongBeat) {
+    if (this.beatModeLabel) {
+      this.beatModeLabel.textContent = isSongBeat ? '🎵 Song Beat: ON' : '🥁 Free Play';
+    }
+    if (this.beatModeBtn) {
+      this.beatModeBtn.classList.toggle('active-mode', isSongBeat);
+    }
+  }
+
+  updateLoopDisplay(isLooping) {
+    if (this.loopToggleBtn) {
+      this.loopToggleBtn.textContent = isLooping ? '⏹️ Stop Loop' : '▶️ Backing Loop';
+      this.loopToggleBtn.classList.toggle('loop-active', isLooping);
     }
   }
 
@@ -88,9 +165,21 @@ export class HUDController {
       return;
     }
 
+    const kit = this.soundEngine ? this.soundEngine.currentKit : 'magalenha';
+    let centerLabel = '🎯 Center Sweetspot (Surdo)';
+    let rimLabel = '⚡ Chrome Rimshot (Repique)';
+
+    if (kit === 'funk') {
+      centerLabel = '🎯 Center Sweetspot (Tamborzão)';
+      rimLabel = '⚡ Chrome Rim (Baile Snare)';
+    } else if (kit === 'acoustic' || kit === '808') {
+      centerLabel = '🎯 Center Sweetspot (Snare)';
+      rimLabel = '⚡ Chrome Rimshot';
+    }
+
     const labels = {
-      snare: '🎯 Center Sweetspot',
-      rim: '⚡ Chrome Rimshot',
+      snare: centerLabel,
+      rim: rimLabel,
       kick: '🦶 Kick Bass'
     };
 
@@ -102,7 +191,7 @@ export class HUDController {
   /**
    * Highlights drum legend item and live feedback badge upon strike
    */
-  flashDrumFeedback(drumName, velocity = 1.0) {
+  flashDrumFeedback(drumName, velocity = 1.0, stepInfo = null) {
     const el = document.getElementById(`legend-${drumName}`);
     if (el) {
       el.classList.add('active-hit');
@@ -110,18 +199,37 @@ export class HUDController {
     }
 
     const strikeBadge = document.getElementById('live-strike-badge');
-    if (strikeBadge) {
+    if (!strikeBadge) return;
+
+    if (stepInfo) {
+      // Song Beat Mode: show step and viral song note
+      strikeBadge.textContent = `🇧🇷 ${stepInfo.song.toUpperCase()} [${stepInfo.label}] (${stepInfo.stepIndex}/${stepInfo.totalSteps})`;
+      const isSurdo = stepInfo.instrument === 'surdo' || stepInfo.instrument === 'tamborzao';
+      strikeBadge.className = `live-strike-badge ${isSurdo ? 'badge-snare' : 'badge-rim'} active`;
+    } else {
+      // Free play mode
+      const kit = this.soundEngine ? this.soundEngine.currentKit : 'magalenha';
       const isRim = drumName === 'rim';
       const isKick = drumName === 'kick';
-      const label = isRim ? '⚡ RIMSHOT!' : (isKick ? '🦶 KICK BASS!' : '🎯 SWEETSPOT HIT!');
-      const colorClass = isRim ? 'badge-rim' : (isKick ? 'badge-kick' : 'badge-snare');
 
+      let label = '🎯 SWEETSPOT HIT!';
+      if (kit === 'magalenha') {
+        label = isRim ? '⚡ REPIQUE CRACK!' : (isKick ? '🦶 SURDO SUB!' : '🎯 SURDO BOOM!');
+      } else if (kit === 'funk') {
+        label = isRim ? '⚡ BAILE CRACK!' : (isKick ? '🦶 TAMBORZÃO!' : '🎯 TAMBORZÃO BOOM!');
+      } else {
+        label = isRim ? '⚡ RIMSHOT!' : (isKick ? '🦶 KICK BASS!' : '🎯 SWEETSPOT HIT!');
+      }
+
+      const colorClass = isRim ? 'badge-rim' : (isKick ? 'badge-kick' : 'badge-snare');
       strikeBadge.textContent = label;
       strikeBadge.className = `live-strike-badge ${colorClass} active`;
-      clearTimeout(this._strikeTimeout);
-      this._strikeTimeout = setTimeout(() => {
-        strikeBadge.classList.remove('active');
-      }, 240);
     }
+
+    clearTimeout(this._strikeTimeout);
+    this._strikeTimeout = setTimeout(() => {
+      strikeBadge.classList.remove('active');
+    }, 280);
   }
 }
+

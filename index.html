@@ -52,9 +52,19 @@
         </div>
 
         <!-- Sound Kit Switcher Toggle -->
-        <button id="btn-kit-toggle" class="btn-action btn-kit-toggle" title="Switch Sound Kit">
+        <button id="btn-kit-toggle" class="btn-action btn-kit-toggle" title="Switch Sound Kit (Key K)">
           <span>Kit:</span>
-          <span id="kit-name-label" class="kit-badge">Acoustic Rock</span>
+          <span id="kit-name-label" class="kit-badge">🇧🇷 Magalenha (Batucada)</span>
+        </button>
+
+        <!-- Song Beat Mode Toggle Button -->
+        <button id="btn-beat-mode" class="btn-action btn-beat-mode active-mode" title="Toggle Song Beat Mode (Key M)">
+          <span id="beat-mode-label">🎵 Song Beat: ON</span>
+        </button>
+
+        <!-- Backing Loop Toggle Button -->
+        <button id="btn-loop-toggle" class="btn-action btn-loop-toggle" title="Toggle Backing Rhythm Loop (Key L)">
+          ▶️ Backing Loop
         </button>
 
         <!-- Camera Preview Toggle Button -->
@@ -65,13 +75,14 @@
     </header>
 
     <!-- Center Live Strike Feedback Banner -->
-    <div id="live-strike-badge" class="live-strike-badge">🎯 SWEETSPOT HIT!</div>
+    <div id="live-strike-badge" class="live-strike-badge">🇧🇷 MAGALENHA [SURDO BOOM 🥁]</div>
 
     <!-- Center Guidance & Calibration Banner -->
     <div id="calibration-banner" class="calibration-banner">
-      <div class="banner-title">3D Concert Drum Ready</div>
+      <div class="banner-title">🇧🇷 Viral Brazilian Drum Beat — "Magalenha"</div>
       <div class="banner-subtitle">
-        Hold your bare hands in front of your webcam like a drummer. Move naturally — <strong>every single hand movement</strong> triggers responsive sound and shockwaves! Strike the <strong>Cyan Center</strong> for Snare or the <strong>Gold Rim</strong> for Rimshots.
+        Featuring <strong>"Magalenha"</strong> (Sérgio Mendes & Carlinhos Brown) — the viral Brazilian carnival Batucada anthem!
+        Move your hands in the air: <strong>every single movement plays the song's beat</strong> (Surdo, Repique, Tamborim, Agogô, Caixa).
       </div>
       <div class="hand-visualizer-hint">
         <div class="hint-hand">
@@ -80,11 +91,15 @@
         </div>
         <div class="hint-hand">
           <span class="hint-hand-icon">🎯</span>
-          <span>Cyan Center: Snare</span>
+          <span>Center: Surdo Boom</span>
         </div>
         <div class="hint-hand">
           <span class="hint-hand-icon">⚡</span>
-          <span>Gold Rim: Rimshot</span>
+          <span>Rim: Repique Crack</span>
+        </div>
+        <div class="hint-hand">
+          <span class="hint-hand-icon">🎵</span>
+          <span>Auto-Song Beat</span>
         </div>
       </div>
     </div>
@@ -94,22 +109,22 @@
       <div class="drum-legend">
         <div id="legend-snare" class="legend-item">
           <span class="legend-color" style="background: #00f0ff;"></span>
-          <span>🎯 Center Sweetspot (Snare)</span>
+          <span id="legend-snare-text">🎯 Center Sweetspot (Surdo Boom)</span>
         </div>
         <div id="legend-rim" class="legend-item">
           <span class="legend-color" style="background: #ffaa00;"></span>
-          <span>⚡ Chrome Rimshot</span>
+          <span id="legend-rim-text">⚡ Chrome Rim (Repique Crack)</span>
         </div>
         <div id="legend-kick" class="legend-item">
           <span class="legend-color" style="background: #00ff88;"></span>
-          <span>🦶 Kick Bass</span>
+          <span id="legend-kick-text">🦶 Surdo Sub Bass</span>
         </div>
       </div>
 
       <div class="kick-spacebar-hint">
         <span>Bass Drum:</span>
         <span class="key-cap">SPACEBAR</span>
-        <span style="color: var(--text-secondary); font-size: 11px;">Keys 1 (Center) & 2 (Rim)</span>
+        <span style="color: var(--text-secondary); font-size: 11px;">M (Beat Mode) | L (Loop) | K (Kit) | Keys 1 & 2</span>
       </div>
     </footer>
   </div>
@@ -117,28 +132,29 @@
   <!-- Start Overlay & Audio Permission Modal -->
   <div id="start-overlay">
     <div class="modal-content">
-      <div style="font-size: 50px;">🥁✨</div>
-      <h2 class="modal-title">AeroDrum 3D</h2>
+      <div style="font-size: 50px;">🇧🇷🥁✨</div>
+      <h2 class="modal-title">AeroDrum 3D - Brazilian Beat Edition</h2>
       <p class="modal-description">
-        Play a hyper-realistic 3D concert drum in mid-air using your bare hands and your webcam.
-        Every hand movement triggers sound — zero installation, zero lag, and instant reaction.
+        Play the iconic viral Brazilian drum beat <strong>"Magalenha"</strong> (Sérgio Mendes & Carlinhos Brown)
+        and Rio Baile Funk in mid-air using your bare hands and your webcam.
+        Every hand movement triggers the song's authentic drum beat!
       </p>
 
       <div class="instructions-grid">
         <div class="instruction-card">
-          <div class="icon">🖐️</div>
-          <strong>Bare Hand Drumming</strong>
-          <div>Hold your hands naturally over the 3D drum in front of your camera</div>
+          <div class="icon">🇧🇷</div>
+          <strong>Viral Brazilian Beats</strong>
+          <div>"Magalenha" Samba Batucada & Brazilian Baile Funk (Tamborzão)</div>
         </div>
         <div class="instruction-card">
           <div class="icon">⚡</div>
-          <strong>Every Movement Plays</strong>
-          <div>Every downstroke, flick, and tap reacts instantly with sound & shockwaves</div>
+          <strong>Song Beat Mode</strong>
+          <div>Every single hand movement plays the next beat in the viral song</div>
         </div>
         <div class="instruction-card">
-          <div class="icon">🦶</div>
-          <strong>Kick Bass & Keys</strong>
-          <div>Tap Spacebar for kick bass, or click drum with mouse/touch</div>
+          <div class="icon">🖐️</div>
+          <strong>Bare Hands & Zero Lag</strong>
+          <div>Center for deep Surdo boom, Rim for sharp Repique metallic crack</div>
         </div>
       </div>
 
