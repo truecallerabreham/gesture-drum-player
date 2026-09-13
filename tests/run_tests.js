@@ -122,6 +122,12 @@ class TestRunner {
             if (val === null || val === undefined) {
               throw new Error(`${msg || 'Expected non-null'} - Got: ${val}`);
             }
+          },
+          isNull: (val, msg) => {
+            assertionCount++;
+            if (val !== null) {
+              throw new Error(`${msg || 'Expected null'} - Got: ${val}`);
+            }
           }
         };
 

@@ -49,5 +49,33 @@ export function runVisionTests(runner) {
       assert.isTrue(strikeHand.velocity.speed > 0.5, 'Speed is elevated');
       assert.isTrue(strikeHand.confidence >= 0.9, 'Confidence is high');
     });
+
+    runner.test('NativeCVTracker.isSkinYCbCr validates chrominance formula directly', (assert) => {
+      // YCbCr testing across human diversity
+      assert.isTrue(NativeCVTracker.isSkinYCbCr(210, 160, 130), 'Light-medium tone valid');
+      assert.isTrue(NativeCVTracker.isSkinYCbCr(180, 130, 95), 'Warm tan tone valid');
+      assert.isTrue(NativeCVTracker.isSkinYCbCr(110, 75, 55), 'Deep melanin-rich tone valid');
+
+      // Rejections
+      assert.isFalse(NativeCVTracker.isSkinYCbCr(0, 200, 255), 'Cyan sky/light rejected');
+      assert.isFalse(NativeCVTracker.isSkinYCbCr(128, 128, 128), 'Neutral gray background rejected');
+    });
+
+    runner.test('NativeCVTracker maintains hand tracking persistence during mid-air stillness', (assert) => {
+      const tracker = new NativeCVTracker();
+
+      // Initialize hand at t = 100
+      tracker.updateHandState('right', 0.65, 0.45, 0.48, [0.55, 0.35, 0.75, 0.58], 0.016, 100);
+
+      // Hand stops moving at t = 200 (100ms pause)
+      const pausedHand = tracker.decayHandState('right', 0.016, 200);
+      assert.isNotNull(pausedHand, 'Hand state persists during 100ms stationary pause');
+      assert.equal(pausedHand.side, 'right', 'Right hand is retained');
+      assert.equal(pausedHand.confidence, 0.6, 'Confidence reflects stationary state');
+
+      // Beyond 400ms dropout timeout (e.g. t = 600)
+      const droppedHand = tracker.decayHandState('right', 0.016, 600);
+      assert.isNull(droppedHand, 'Hand state cleanly deactivates after 400ms absence');
+    });
   });
 }
