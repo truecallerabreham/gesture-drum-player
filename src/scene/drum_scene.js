@@ -363,7 +363,7 @@ export class DrumScene {
         // Distance from drum center determines sweetspot vs rimshot
         const distToCenter = projectedHit.distanceTo(snareDrum.center);
         const bestDrumName = distToCenter < 0.60 ? 'snare' : 'rim';
-        const inDrumBounds = distToCenter <= (snareDrum.radius * 1.08);
+        const inDrumBounds = distToCenter <= (snareDrum.radius * 1.55);
 
         if (inDrumBounds) {
           reticle.group.position.set(projectedHit.x, projectedHit.y + 0.015, projectedHit.z);

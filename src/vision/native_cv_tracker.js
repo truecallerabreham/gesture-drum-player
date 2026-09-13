@@ -122,18 +122,14 @@ export class NativeCVTracker {
       return { left: null, right: null, count: 0 };
     }
 
-    // Accumulators for Left Hand (mirroredX < midX) and Right Hand (mirroredX >= midX)
-    let leftSumX = 0, leftSumY = 0, leftMass = 0;
-    let leftSumX2 = 0, leftSumY2 = 0, leftSumXY = 0;
-    let leftMinX = this.width, leftMaxX = 0, leftMinY = this.height, leftMaxY = 0;
-    let leftMotionY = 0, leftMotionCount = 0;
-
-    let rightSumX = 0, rightSumY = 0, rightMass = 0;
-    let rightSumX2 = 0, rightSumY2 = 0, rightSumXY = 0;
-    let rightMinX = this.width, rightMaxX = 0, rightMinY = this.height, rightMaxY = 0;
-    let rightMotionY = 0, rightMotionCount = 0;
-
-    const midX = Math.floor(this.width / 2);
+    // 1D column projection accumulators across entire screen width (160 columns)
+    const colMass = new Float32Array(this.width);
+    const colSumY = new Float32Array(this.width);
+    const colSumY2 = new Float32Array(this.width);
+    const colSumXY = new Float32Array(this.width);
+    const colMinY = new Float32Array(this.width).fill(this.height);
+    const colMaxY = new Float32Array(this.width).fill(0);
+    let totalMass = 0;
 
     for (let y = 0; y < this.height; y++) {
       const rowOffset = y * this.width;
@@ -155,47 +151,17 @@ export class NativeCVTracker {
 
         // Pixel contributes if it is skin color OR moving skin
         if (isSkin || (hasMotion && r > 40)) {
-          // Weight: stationary skin has stable weight; motion adds kinetic responsiveness
           const weight = isSkin ? (1.0 + (hasMotion ? diff * 0.08 : 0)) : (diff * 0.05);
-
           // Horizontal mirror so camera feed matches player's first-person perspective
           const mirroredX = this.width - 1 - x;
 
-          if (mirroredX < midX) {
-            // Left Hand Zone
-            leftSumX += mirroredX * weight;
-            leftSumY += y * weight;
-            leftSumX2 += mirroredX * mirroredX * weight;
-            leftSumY2 += y * y * weight;
-            leftSumXY += mirroredX * y * weight;
-            leftMass += weight;
-            if (mirroredX < leftMinX) leftMinX = mirroredX;
-            if (mirroredX > leftMaxX) leftMaxX = mirroredX;
-            if (y < leftMinY) leftMinY = y;
-            if (y > leftMaxY) leftMaxY = y;
-
-            if (hasMotion) {
-              leftMotionY += y;
-              leftMotionCount++;
-            }
-          } else {
-            // Right Hand Zone
-            rightSumX += mirroredX * weight;
-            rightSumY += y * weight;
-            rightSumX2 += mirroredX * mirroredX * weight;
-            rightSumY2 += y * y * weight;
-            rightSumXY += mirroredX * y * weight;
-            rightMass += weight;
-            if (mirroredX < rightMinX) rightMinX = mirroredX;
-            if (mirroredX > rightMaxX) rightMaxX = mirroredX;
-            if (y < rightMinY) rightMinY = y;
-            if (y > rightMaxY) rightMaxY = y;
-
-            if (hasMotion) {
-              rightMotionY += y;
-              rightMotionCount++;
-            }
-          }
+          colMass[mirroredX] += weight;
+          colSumY[mirroredX] += y * weight;
+          colSumY2[mirroredX] += y * y * weight;
+          colSumXY[mirroredX] += mirroredX * y * weight;
+          if (y < colMinY[mirroredX]) colMinY[mirroredX] = y;
+          if (y > colMaxY[mirroredX]) colMaxY[mirroredX] = y;
+          totalMass += weight;
         }
       }
     }
@@ -206,73 +172,159 @@ export class NativeCVTracker {
       count: 0
     };
 
-    // Update Left Hand
-    if (leftMass > this.minSkinMass) {
-      const meanX = leftSumX / leftMass;
-      const meanY = leftSumY / leftMass;
-      const rawX = meanX / this.width;
-      const rawY = meanY / this.height;
-      const strikeY = leftMaxY / this.height;
-      const bbox = [leftMinX / this.width, leftMinY / this.height, leftMaxX / this.width, leftMaxY / this.height];
-
-      // Second central moments (spatial orientation and dispersion)
-      const mu20 = (leftSumX2 / leftMass) - (meanX * meanX);
-      const mu02 = (leftSumY2 / leftMass) - (meanY * meanY);
-      const mu11 = (leftSumXY / leftMass) - (meanX * meanY);
-
-      // Principal axis roll angle (tilt in radians, natural wrist roll)
-      const rawRoll = 0.5 * Math.atan2(2 * mu11, mu20 - mu02);
-
-      // Spatial dispersion (open hand has wide spread, closed fist/strike has small spread)
-      const dispersion = Math.sqrt(Math.max(0, mu20 + mu02));
-      const rawOpenness = Math.max(0.3, Math.min(1.8, dispersion / 14.0));
-
-      // Hand scale / depth (closer to camera = larger mass = closer to drum in 3D)
-      const handScale = Math.max(0.6, Math.min(2.2, Math.sqrt(leftMass) / 12.0));
-
-      detected.left = this.updateHandState('left', rawX, rawY, strikeY, bbox, dt, timestamp, {
-        roll: rawRoll,
-        openness: rawOpenness,
-        handScale
-      });
-      detected.count++;
-    } else {
+    if (totalMass < this.minSkinMass) {
       detected.left = this.decayHandState('left', dt, timestamp);
+      detected.right = this.decayHandState('right', dt, timestamp);
       if (detected.left) detected.count++;
+      if (detected.right) detected.count++;
+      this.renderAROverlay(video, detected);
+      return detected;
     }
 
-    // Update Right Hand
-    if (rightMass > this.minSkinMass) {
-      const meanX = rightSumX / rightMass;
-      const meanY = rightSumY / rightMass;
+    // Smooth column profile with 3-tap filter
+    const smoothMass = new Float32Array(this.width);
+    for (let x = 1; x < this.width - 1; x++) {
+      smoothMass[x] = 0.25 * colMass[x - 1] + 0.5 * colMass[x] + 0.25 * colMass[x + 1];
+    }
+
+    // Find peaks (local maxima) with significant mass
+    const peaks = [];
+    for (let x = 3; x < this.width - 3; x++) {
+      if (smoothMass[x] > smoothMass[x - 1] &&
+          smoothMass[x] > smoothMass[x + 1] &&
+          smoothMass[x] > smoothMass[x - 2] &&
+          smoothMass[x] > smoothMass[x + 2] &&
+          smoothMass[x] > 4.0) {
+        peaks.push({ x, mass: smoothMass[x] });
+      }
+    }
+
+    peaks.sort((a, b) => b.mass - a.mass);
+
+    // Determine if we have 2 distinct hands or 1 hand moving anywhere on screen
+    let isDualHands = false;
+    let splitX = Math.floor(this.width / 2);
+
+    if (peaks.length >= 2) {
+      const p1 = peaks[0].x;
+      const p2 = peaks[1].x;
+      const dist = Math.abs(p1 - p2);
+
+      // If the two peaks are separated by at least 22 pixels (~14% screen width)
+      if (dist >= 22) {
+        isDualHands = true;
+        const leftP = Math.min(p1, p2);
+        const rightP = Math.max(p1, p2);
+
+        // Find the valley (lowest mass column) between the two peaks
+        let minV = Infinity;
+        for (let x = leftP; x <= rightP; x++) {
+          if (smoothMass[x] < minV) {
+            minV = smoothMass[x];
+            splitX = x;
+          }
+        }
+      }
+    }
+
+    // Helper to compute hand centroid, orientation, openness, and scale from a column range
+    const extractHandFromRange = (startCol, endCol) => {
+      let sumM = 0, sumX = 0, sumY = 0;
+      let sumX2 = 0, sumY2 = 0, sumXY = 0;
+      let minX = this.width, maxX = 0, minY = this.height, maxY = 0;
+
+      for (let x = startCol; x <= endCol; x++) {
+        const m = colMass[x];
+        if (m <= 0.001) continue;
+        sumM += m;
+        sumX += x * m;
+        sumY += colSumY[x];
+        sumX2 += x * x * m;
+        sumY2 += colSumY2[x];
+        sumXY += colSumXY[x];
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (colMinY[x] < minY) minY = colMinY[x];
+        if (colMaxY[x] > maxY) maxY = colMaxY[x];
+      }
+
+      if (sumM < this.minSkinMass) return null;
+
+      const meanX = sumX / sumM;
+      const meanY = sumY / sumM;
       const rawX = meanX / this.width;
       const rawY = meanY / this.height;
-      const strikeY = rightMaxY / this.height;
-      const bbox = [rightMinX / this.width, rightMinY / this.height, rightMaxX / this.width, rightMaxY / this.height];
+      const strikeY = maxY / this.height;
+      const bbox = [minX / this.width, minY / this.height, maxX / this.width, maxY / this.height];
 
-      // Second central moments (spatial orientation and dispersion)
-      const mu20 = (rightSumX2 / rightMass) - (meanX * meanX);
-      const mu02 = (rightSumY2 / rightMass) - (meanY * meanY);
-      const mu11 = (rightSumXY / rightMass) - (meanX * meanY);
+      const mu20 = (sumX2 / sumM) - (meanX * meanX);
+      const mu02 = (sumY2 / sumM) - (meanY * meanY);
+      const mu11 = (sumXY / sumM) - (meanX * meanY);
 
-      const rawRoll = 0.5 * Math.atan2(2 * mu11, mu20 - mu02);
+      const roll = 0.5 * Math.atan2(2 * mu11, mu20 - mu02);
       const dispersion = Math.sqrt(Math.max(0, mu20 + mu02));
-      const rawOpenness = Math.max(0.3, Math.min(1.8, dispersion / 14.0));
-      const handScale = Math.max(0.6, Math.min(2.2, Math.sqrt(rightMass) / 12.0));
+      const openness = Math.max(0.3, Math.min(1.8, dispersion / 14.0));
+      const handScale = Math.max(0.6, Math.min(2.2, Math.sqrt(sumM) / 12.0));
 
-      detected.right = this.updateHandState('right', rawX, rawY, strikeY, bbox, dt, timestamp, {
-        roll: rawRoll,
-        openness: rawOpenness,
-        handScale
-      });
-      detected.count++;
+      return { rawX, rawY, strikeY, bbox, roll, openness, handScale };
+    };
+
+    if (isDualHands) {
+      // DUAL HAND MODE: Two separate hands present simultaneously
+      const leftData = extractHandFromRange(0, splitX - 1);
+      const rightData = extractHandFromRange(splitX, this.width - 1);
+
+      if (leftData) {
+        detected.left = this.updateHandState('left', leftData.rawX, leftData.rawY, leftData.strikeY, leftData.bbox, dt, timestamp, leftData);
+        detected.count++;
+      } else {
+        detected.left = this.decayHandState('left', dt, timestamp);
+        if (detected.left) detected.count++;
+      }
+
+      if (rightData) {
+        detected.right = this.updateHandState('right', rightData.rawX, rightData.rawY, rightData.strikeY, rightData.bbox, dt, timestamp, rightData);
+        detected.count++;
+      } else {
+        detected.right = this.decayHandState('right', dt, timestamp);
+        if (detected.right) detected.count++;
+      }
     } else {
-      detected.right = this.decayHandState('right', dt, timestamp);
-      if (detected.right) detected.count++;
+      // SINGLE HAND MODE: Play anywhere across the FULL SCREEN and entire drumhead!
+      const singleData = extractHandFromRange(0, this.width - 1);
+
+      if (singleData) {
+        // Choose which hand slot to update based on previous active state or horizontal position
+        let targetSide = 'right';
+        let otherSide = 'left';
+
+        if (this.history.left.active && !this.history.right.active) {
+          targetSide = 'left';
+          otherSide = 'right';
+        } else if (this.history.right.active && !this.history.left.active) {
+          targetSide = 'right';
+          otherSide = 'left';
+        } else {
+          // If neither or both was active, assign based on centroid
+          targetSide = singleData.rawX < 0.5 ? 'left' : 'right';
+          otherSide = targetSide === 'left' ? 'right' : 'left';
+        }
+
+        detected[targetSide] = this.updateHandState(targetSide, singleData.rawX, singleData.rawY, singleData.strikeY, singleData.bbox, dt, timestamp, singleData);
+        detected.count++;
+
+        detected[otherSide] = this.decayHandState(otherSide, dt, timestamp);
+        if (detected[otherSide]) detected.count++;
+      } else {
+        detected.left = this.decayHandState('left', dt, timestamp);
+        detected.right = this.decayHandState('right', dt, timestamp);
+        if (detected.left) detected.count++;
+        if (detected.right) detected.count++;
+      }
     }
 
     // Render live AR debug camera view
-    this.renderAROverlay(video, detected);
+    this.renderAROverlay(video, detected, splitX, isDualHands);
 
     return detected;
   }
@@ -401,7 +453,7 @@ export class NativeCVTracker {
   /**
    * Renders the live video feed into the on-screen preview window with neon AR tracking overlays
    */
-  renderAROverlay(video, detected) {
+  renderAROverlay(video, detected, splitX = null, isDualHands = false) {
     if (!this.debugCtx || !this.debugCanvas) return;
 
     const dw = this.debugCanvas.width;
@@ -418,14 +470,17 @@ export class NativeCVTracker {
     this.debugCtx.fillStyle = 'rgba(10, 15, 25, 0.35)';
     this.debugCtx.fillRect(0, 0, dw, dh);
 
-    // 3. Center divider line between Left and Right hands
-    this.debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    this.debugCtx.setLineDash([4, 4]);
-    this.debugCtx.beginPath();
-    this.debugCtx.moveTo(dw / 2, 0);
-    this.debugCtx.lineTo(dw / 2, dh);
-    this.debugCtx.stroke();
-    this.debugCtx.setLineDash([]);
+    // 3. Dynamic separation line only when 2 hands are active simultaneously
+    if (isDualHands && splitX !== null) {
+      const divX = (splitX / this.width) * dw;
+      this.debugCtx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+      this.debugCtx.setLineDash([4, 4]);
+      this.debugCtx.beginPath();
+      this.debugCtx.moveTo(divX, 0);
+      this.debugCtx.lineTo(divX, dh);
+      this.debugCtx.stroke();
+      this.debugCtx.setLineDash([]);
+    }
 
     // 4. Render Left Hand AR Overlay (Neon Cyan)
     if (detected.left) {
