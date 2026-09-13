@@ -20,10 +20,10 @@
   <!-- Raw Webcam Video Feed (Operates invisibly in background for computer vision) -->
   <video id="webcam-video" autoplay playsinline muted></video>
 
-  <!-- Live Optical Motion Preview for Calibration / Debugging -->
+  <!-- Live AR Camera Tracker Preview (Mirror Feed with Real-Time Neon Hand Reticles) -->
   <div id="camera-preview-container">
-    <canvas id="cv-debug-canvas" width="160" height="120" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px; display: block;"></canvas>
-    <div style="color: #00f0ff; font-size: 10px; padding: 4px; text-align: center; background: rgba(0,0,0,0.7); font-weight: 700; border-radius: 0 0 6px 6px;">Native CV Motion Heatmap</div>
+    <canvas id="cv-debug-canvas" width="180" height="135"></canvas>
+    <div class="preview-badge">Live AR Hand Tracker</div>
   </div>
 
   <!-- Heads-Up Display (HUD) -->

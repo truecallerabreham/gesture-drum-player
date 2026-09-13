@@ -72,8 +72,14 @@ export class HUDController {
     }
 
     if (this.btnToggleCam && this.cameraPreview) {
+      this.btnToggleCam.classList.add('active-mode');
       this.btnToggleCam.addEventListener('click', () => {
-        this.cameraPreview.classList.toggle('visible');
+        const isHidden = this.cameraPreview.classList.toggle('hidden-preview');
+        if (!isHidden) {
+          this.btnToggleCam.classList.add('active-mode');
+        } else {
+          this.btnToggleCam.classList.remove('active-mode');
+        }
       });
     }
 
