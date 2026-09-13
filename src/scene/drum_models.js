@@ -68,11 +68,11 @@ export class DrumKitModels {
     const THREE = this.THREE;
 
     // Single Prominent 3D Concert Snare Drum
-    // Centered directly in front of the drummer with comfortable forward tilt
-    const drumPos = new THREE.Vector3(0, -0.22, -2.05);
-    const drumRot = new THREE.Euler(0.24, 0, 0); // 14-degree ergonomic tilt towards player
-    const drumRadius = 1.05;
-    const drumHeight = 0.52;
+    // Centered directly beneath the player's natural webcam hand space with ergonomic forward tilt
+    const drumPos = new THREE.Vector3(0, -0.42, -1.70);
+    const drumRot = new THREE.Euler(0.42, 0, 0); // 24-degree natural ergonomic tilt aligned with webcam hands
+    const drumRadius = 1.15;
+    const drumHeight = 0.55;
 
     this.singleDrumGroup = new THREE.Group();
     this.singleDrumGroup.position.copy(drumPos);
@@ -112,11 +112,11 @@ export class DrumKitModels {
     this.singleDrumGroup.add(topHead);
 
     // Visual Sweetspot Ring (Center target graphic for drummer clarity)
-    const sweetspotGeo = new THREE.RingGeometry(0.35, 0.38, 48);
+    const sweetspotGeo = new THREE.RingGeometry(0.44, 0.48, 48);
     const sweetspotMat = new THREE.MeshBasicMaterial({
       color: 0x00f0ff,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.6,
       side: THREE.DoubleSide
     });
     const sweetspotRing = new THREE.Mesh(sweetspotGeo, sweetspotMat);
@@ -125,18 +125,18 @@ export class DrumKitModels {
     this.singleDrumGroup.add(sweetspotRing);
 
     // Center Sweetspot Dot
-    const centerDotGeo = new THREE.CircleGeometry(0.06, 24);
+    const centerDotGeo = new THREE.CircleGeometry(0.07, 24);
     const centerDot = new THREE.Mesh(centerDotGeo, sweetspotMat);
     centerDot.rotation.x = -Math.PI / 2;
     centerDot.position.y = drumHeight * 0.5 + 0.009;
     this.singleDrumGroup.add(centerDot);
 
     // Outer Rimshot Zone Ring
-    const rimZoneGeo = new THREE.RingGeometry(0.85, 0.90, 48);
+    const rimZoneGeo = new THREE.RingGeometry(0.96, 1.04, 48);
     const rimZoneMat = new THREE.MeshBasicMaterial({
       color: 0xffaa00,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.45,
       side: THREE.DoubleSide
     });
     const rimZoneRing = new THREE.Mesh(rimZoneGeo, rimZoneMat);

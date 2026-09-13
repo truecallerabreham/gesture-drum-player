@@ -92,8 +92,8 @@ class AeroDrumApp {
     // 1. Play low-latency synthesized drum audio
     this.soundEngine.play(drumName, velocity);
 
-    // 2. Trigger 3D drumhead recoil, shockwave ripple & neon particle sparks
-    this.drumScene.onHit(drumName, velocity, position);
+    // 2. Trigger 3D drumhead recoil, shockwave ripple, neon particles & hand pulse
+    this.drumScene.onHit(drumName, velocity, position, source);
 
     // 3. Highlight HUD legend & live strike feedback badge
     this.hud.flashDrumFeedback(drumName, velocity);

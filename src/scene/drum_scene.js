@@ -47,8 +47,8 @@ export class DrumScene {
     const aspect = window.innerWidth / window.innerHeight;
     // Perspective camera positioned from drummer's first-person eye level looking at kit
     this.camera = new THREE.PerspectiveCamera(65, aspect, 0.1, 100);
-    this.camera.position.set(0, 0.4, 0.5);
-    this.camera.lookAt(0, -0.1, -2.8);
+    this.camera.position.set(0, 0.45, 0.45);
+    this.camera.lookAt(0, -0.32, -1.70);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -72,9 +72,9 @@ export class DrumScene {
 
     // Main Overhead Drum Stage Spotlight (Cyan/Cool White)
     const mainSpot = new THREE.SpotLight(0xaad8ff, 3.5);
-    mainSpot.position.set(0, 4.5, -1.5);
-    mainSpot.target.position.set(0, -0.2, -2.8);
-    mainSpot.angle = Math.PI / 4;
+    mainSpot.position.set(0, 4.0, -1.0);
+    mainSpot.target.position.set(0, -0.35, -1.70);
+    mainSpot.angle = Math.PI / 3.5;
     mainSpot.penumbra = 0.5;
     mainSpot.castShadow = true;
     mainSpot.shadow.mapSize.width = 1024;
@@ -275,7 +275,7 @@ export class DrumScene {
     const pip = new THREE.Mesh(pipGeo, ringMat);
     group.add(pip);
 
-    group.rotation.x = -Math.PI / 2 + 0.24; // Align with tilted drumhead
+    group.rotation.x = -Math.PI / 2 + 0.42; // Align with tilted drumhead
     group.visible = false;
     this.scene.add(group);
 
@@ -297,9 +297,9 @@ export class DrumScene {
   }
 
   /**
-   * Triggers visual strike feedback (recoil + sparks + shockwave ripple + light flare)
+   * Triggers visual strike feedback (recoil + sparks + shockwave ripple + light flare + hand pulse)
    */
-  onHit(drumName, velocity = 1.0, position = null) {
+  onHit(drumName, velocity = 1.0, position = null, source = null) {
     const drum = this.drumKit.drums[drumName] || (drumName === 'kick' ? this.drumKit.drums.kick : null);
     if (!drum) return;
 
@@ -316,6 +316,15 @@ export class DrumScene {
     // 4. Dynamic stage light pulse
     this.flashLight.color.setHex(drum.color);
     this.flashLight.intensity = 2.5 * velocity;
+
+    // 5. Hand pulse feedback
+    if (this.avatarHands) {
+      if (source && (source.includes('left') || source === 'left')) {
+        this.avatarHands.pulse('left', velocity);
+      } else if (source && (source.includes('right') || source === 'right')) {
+        this.avatarHands.pulse('right', velocity);
+      }
+    }
   }
 
   /**
@@ -325,55 +334,44 @@ export class DrumScene {
     const now = performance.now();
     const THREE = this.THREE;
 
-    // 1. Update 3D avatar hands tracking and raycasting
+    // 1. Update 3D avatar hands tracking and projection onto drumhead
     if (this.avatarHands && detectedHands) {
       this.avatarHands.update(detectedHands, this.camera);
 
       ['left', 'right'].forEach(side => {
-        const aimRay = this.avatarHands.getAimRay(side);
+        const handTip = this.avatarHands.getTipPosition(side);
         const reticle = this.targetReticles ? this.targetReticles[side] : null;
 
-        if (!aimRay || !reticle || !detectedHands[side]) {
+        if (!handTip || !reticle || !detectedHands[side]) {
           if (reticle) reticle.group.visible = false;
-          this.avatarHands.setLaserTarget(side, null);
           this.targetedDrums[side] = null;
           return;
         }
 
-        let bestHit = null;
-        let bestDrumName = null;
-
         const snareDrum = this.drumKit && this.drumKit.drums ? this.drumKit.drums.snare : null;
-        if (snareDrum && snareDrum.center) {
-          const normal = new THREE.Vector3(0, 1, 0).applyEuler(snareDrum.baseRot || new THREE.Euler(0.24, 0, 0));
-          const discHit = MathUtils.rayIntersectsDisc(
-            aimRay.origin,
-            aimRay.direction,
-            snareDrum.center,
-            1.25, // full drumhead radius including rim
-            normal
-          );
-
-          if (discHit) {
-            bestHit = discHit.hitPoint;
-            // Radius < 0.58m is Center Sweetspot (Snare), >= 0.58m is Chrome Rim (Rimshot)
-            bestDrumName = discHit.distToCenter < 0.58 ? 'snare' : 'rim';
-          } else {
-            // Proximity fallback if pointing roughly at drum
-            const rayDist = MathUtils.rayDistanceToPoint(aimRay.origin, aimRay.direction, snareDrum.center);
-            if (rayDist < 1.35) {
-              bestHit = snareDrum.center;
-              bestDrumName = 'snare';
-            }
-          }
+        if (!snareDrum || !snareDrum.center) {
+          if (reticle) reticle.group.visible = false;
+          return;
         }
 
-        if (bestHit && bestDrumName) {
-          reticle.group.position.set(bestHit.x, bestHit.y + 0.015, bestHit.z);
+        // Project 3D hand position onto the tilted drumhead plane
+        const normal = new THREE.Vector3(0, 1, 0).applyEuler(snareDrum.baseRot || new THREE.Euler(0.42, 0, 0));
+        const toHand = new THREE.Vector3().subVectors(handTip, snareDrum.center);
+        const distAlongNormal = toHand.dot(normal);
+        const projectedHit = new THREE.Vector3().subVectors(handTip, normal.clone().multiplyScalar(distAlongNormal));
+
+        // Distance from drum center determines sweetspot vs rimshot
+        const distToCenter = projectedHit.distanceTo(snareDrum.center);
+        const bestDrumName = distToCenter < 0.60 ? 'snare' : 'rim';
+        const inDrumBounds = distToCenter <= (snareDrum.radius * 1.08);
+
+        if (inDrumBounds) {
+          reticle.group.position.set(projectedHit.x, projectedHit.y + 0.015, projectedHit.z);
           reticle.group.visible = true;
 
-          // Pulse animation
-          const pulse = 1.0 + 0.08 * Math.sin(now * 0.01);
+          // Pulse scale based on downward velocity and motion
+          const vy = detectedHands[side].velocity ? Math.max(0, detectedHands[side].velocity.vy) : 0;
+          const pulse = 1.0 + Math.min(0.45, vy * 0.12) + 0.05 * Math.sin(now * 0.01);
           reticle.group.scale.set(pulse, pulse, pulse);
 
           const drum = this.drumKit.drums[bestDrumName];
@@ -381,11 +379,9 @@ export class DrumScene {
             reticle.ringMat.color.setHex(drum.color);
           }
 
-          this.avatarHands.setLaserTarget(side, new THREE.Vector3(bestHit.x, bestHit.y, bestHit.z));
           this.targetedDrums[side] = bestDrumName;
         } else {
           reticle.group.visible = false;
-          this.avatarHands.setLaserTarget(side, null);
           this.targetedDrums[side] = null;
         }
       });
