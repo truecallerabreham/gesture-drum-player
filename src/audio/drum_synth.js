@@ -391,4 +391,300 @@ export class DrumSynth {
     noise.start(t);
     noise.stop(t + duration);
   }
+
+  // =========================================================================
+  // BRAZILIAN BATUCADA & VIRAL SONG PERCUSSION (MAGALENHA & SAMBA)
+  // =========================================================================
+
+  /**
+   * Brazilian Surdo de Marcação - Deep resonant carnival bass drum with dual-head ring
+   */
+  static playSurdo(ctx, dest, time = 0, velocity = 1.0, pitch = 55) {
+    const t = time || ctx.currentTime;
+
+    // 1. Deep fundamental sub-bass body (large 20-22" Brazilian bass drum)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(pitch * 1.35, t);
+    osc.frequency.exponentialRampToValueAtTime(pitch, t + 0.09);
+
+    const amp = 1.45 * velocity;
+    gain.gain.setValueAtTime(amp, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.58);
+
+    osc.connect(gain);
+    gain.connect(dest);
+    osc.start(t);
+    osc.stop(t + 0.6);
+
+    // 2. Leather drumhead skin vibration & harmonic resonance
+    const skinOsc = ctx.createOscillator();
+    const skinGain = ctx.createGain();
+    skinOsc.type = 'triangle';
+    skinOsc.frequency.setValueAtTime(pitch * 2.08, t);
+    skinOsc.frequency.exponentialRampToValueAtTime(pitch * 1.85, t + 0.12);
+
+    skinGain.gain.setValueAtTime(0.75 * velocity, t);
+    skinGain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+    skinOsc.connect(skinGain);
+    skinGain.connect(dest);
+    skinOsc.start(t);
+    skinOsc.stop(t + 0.4);
+
+    // 3. Padded soft mallet strike thud
+    const thudOsc = ctx.createOscillator();
+    const thudGain = ctx.createGain();
+    thudOsc.type = 'sine';
+    thudOsc.frequency.setValueAtTime(190, t);
+    thudOsc.frequency.exponentialRampToValueAtTime(70, t + 0.04);
+
+    thudGain.gain.setValueAtTime(0.9 * velocity, t);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+    thudOsc.connect(thudGain);
+    thudGain.connect(dest);
+    thudOsc.start(t);
+    thudOsc.stop(t + 0.06);
+  }
+
+  /**
+   * Brazilian Repique / Repinique - High metallic rimshot & sharp stick slap
+   */
+  static playRepique(ctx, dest, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+
+    // 1. High-energy aluminum shell crack transient
+    const crack = ctx.createOscillator();
+    const crackGain = ctx.createGain();
+    crack.type = 'triangle';
+    crack.frequency.setValueAtTime(680, t);
+    crack.frequency.exponentialRampToValueAtTime(260, t + 0.032);
+
+    crackGain.gain.setValueAtTime(1.25 * velocity, t);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+
+    crack.connect(crackGain);
+    crackGain.connect(dest);
+    crack.start(t);
+    crack.stop(t + 0.12);
+
+    // 2. Dual metallic shell ring overtones (aluminum body)
+    [460, 1420].forEach((freq, idx) => {
+      const ping = ctx.createOscillator();
+      const pingGain = ctx.createGain();
+      ping.type = 'sine';
+      ping.frequency.setValueAtTime(freq, t);
+
+      const a = (idx === 0 ? 0.7 : 0.45) * velocity;
+      pingGain.gain.setValueAtTime(a, t);
+      pingGain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+
+      ping.connect(pingGain);
+      pingGain.connect(dest);
+      ping.start(t);
+      ping.stop(t + 0.16);
+    });
+
+    // 3. Crisp stick transient noise burst
+    const noise = ctx.createBufferSource();
+    noise.buffer = DrumSynth.getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(2200, t);
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(1.15 * velocity, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(dest);
+
+    noise.start(t);
+    noise.stop(t + 0.09);
+  }
+
+  /**
+   * Brazilian Tamborim - Ultra-crisp high-tension samba hand drum whip
+   */
+  static playTamborim(ctx, dest, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(780, t);
+    osc.frequency.exponentialRampToValueAtTime(380, t + 0.025);
+
+    gain.gain.setValueAtTime(1.1 * velocity, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.065);
+
+    osc.connect(gain);
+    gain.connect(dest);
+    osc.start(t);
+    osc.stop(t + 0.07);
+
+    // High overtone ping
+    const overtone = ctx.createOscillator();
+    const ovGain = ctx.createGain();
+    overtone.type = 'sine';
+    overtone.frequency.setValueAtTime(2350, t);
+
+    ovGain.gain.setValueAtTime(0.55 * velocity, t);
+    ovGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+    overtone.connect(ovGain);
+    ovGain.connect(dest);
+    overtone.start(t);
+    overtone.stop(t + 0.055);
+  }
+
+  /**
+   * Brazilian Agogô - Dual carnival iron bells
+   */
+  static playAgogo(ctx, dest, high = false, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+    const baseFreq = high ? 1140 : 840;
+
+    // Harmonic bell frequencies
+    [1.0, 2.76].forEach((mult, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(baseFreq * mult, t);
+
+      const a = (idx === 0 ? 0.85 : 0.4) * velocity;
+      gain.gain.setValueAtTime(a, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(t);
+      osc.stop(t + 0.24);
+    });
+  }
+
+  /**
+   * Brazilian Caixa de Guerra - Samba snare with snare wires on top head
+   */
+  static playCaixa(ctx, dest, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+
+    // Drum tone
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(270, t);
+    osc.frequency.exponentialRampToValueAtTime(175, t + 0.05);
+
+    oscGain.gain.setValueAtTime(0.7 * velocity, t);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+    osc.connect(oscGain);
+    oscGain.connect(dest);
+    osc.start(t);
+    osc.stop(t + 0.15);
+
+    // Bright buzzing wires
+    const noise = ctx.createBufferSource();
+    noise.buffer = DrumSynth.getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(1400, t);
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(1.1 * velocity, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(dest);
+
+    noise.start(t);
+    noise.stop(t + 0.21);
+  }
+
+  // =========================================================================
+  // BRAZILIAN BAILE FUNK / TAMBORZÃO (VIRAL TIKTOK BEAT)
+  // =========================================================================
+
+  /**
+   * Brazilian Funk Tamborzão Sub Kick - Iconic deep punchy sub-bass drop
+   */
+  static playTamborzaoKick(ctx, dest, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    // Deep Brazilian funk punch
+    osc.frequency.setValueAtTime(145, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.08);
+
+    gain.gain.setValueAtTime(1.5 * velocity, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+
+    // Transient slap
+    const slap = ctx.createOscillator();
+    const slapGain = ctx.createGain();
+    slap.type = 'triangle';
+    slap.frequency.setValueAtTime(320, t);
+    slap.frequency.exponentialRampToValueAtTime(80, t + 0.03);
+    slapGain.gain.setValueAtTime(0.9 * velocity, t);
+    slapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+
+    slap.connect(slapGain);
+    slapGain.connect(dest);
+    slap.start(t);
+    slap.stop(t + 0.045);
+
+    osc.connect(gain);
+    gain.connect(dest);
+    osc.start(t);
+    osc.stop(t + 0.66);
+  }
+
+  /**
+   * Brazilian Funk Baile Snare Crack / Volt Clap - Crisp syncopated crack
+   */
+  static playBaileSnare(ctx, dest, time = 0, velocity = 1.0) {
+    const t = time || ctx.currentTime;
+
+    // Snappy pitch transient
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(920, t);
+    osc.frequency.exponentialRampToValueAtTime(280, t + 0.03);
+
+    oscGain.gain.setValueAtTime(1.0 * velocity, t);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+    osc.connect(oscGain);
+    oscGain.connect(dest);
+    osc.start(t);
+    osc.stop(t + 0.09);
+
+    // Gated clapping noise burst
+    const noise = ctx.createBufferSource();
+    noise.buffer = DrumSynth.getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1800, t);
+    filter.Q.setValueAtTime(1.5, t);
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(1.25 * velocity, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(dest);
+
+    noise.start(t);
+    noise.stop(t + 0.13);
+  }
 }
+
